@@ -1,0 +1,12 @@
+# pychache
+src/__pychache__/*
+
+# venv
+venv/*
+
+# data
+src/data/*
+src/*.csv
+
+# pycharm setting
+.idea/*
