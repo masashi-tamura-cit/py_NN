@@ -1,5 +1,6 @@
 import unittest
-from classes import Layer, Weights, NetWork
+import numpy as np
+from classes import *
 from consts import *
 
 
@@ -8,7 +9,12 @@ class TestNN(unittest.TestCase):
     val = 5
     actual_network = NetWork(val)
     actual_Layer = Layer(val)
-
+    actual_Layer.net_values = np.arange(0, BATCH_SIZE*val).reshape(BATCH_SIZE, val)
+    s_val = 4
+    actual_S_Layer = SoftMaxLayer(s_val)
+    actual_weight = Weights(np.ones((val + 1, s_val)), actual_Layer, actual_S_Layer)
+    actual_Layer.lag_weights = actual_weight
+    actual_S_Layer.lead_weights = actual_S_Layer
 
     def test_Layer_constructor(self):
         self.assertEqual(self.val, self.actual_Layer.node_amount)
@@ -25,23 +31,39 @@ class TestNN(unittest.TestCase):
         self.assertEqual(self.actual_network.layers[2].lead_weights.lead_layer, self.actual_network.layers[1])
 
     def test_Layer_norm(self):
-        pass
+        self.actual_Layer.normalize()
+        self.assertEqual(0, np.average(self.actual_Layer.net_values))
+        self.assertEqual(1, np.var(self.actual_Layer.net_values))
 
     def test_Layer_activate(self):
-        pass
-
-    def test_SoftMaxLayer_activate(self):
-        pass
+        self.actual_Layer.normalize()
+        self.actual_Layer.activate()
+        self.assertEqual(0, self.actual_Layer.activated_values.min())
+        self.assertNotEqual(0, np.var(self.actual_Layer.activated_values))
+        self.assertNotEqual(0, np.average(self.actual_Layer.activated_values))
 
     def test_Layer_calc_net_values(self):
-        pass
+        self.actual_Layer.normalize()
+        self.actual_Layer.activate()
+        self.actual_Layer.calc_net_values()
+        self.assertEqual(self.actual_S_Layer.net_values.size, BATCH_SIZE * self.s_val)
 
-    def test_Layer_lag_prop(self):
-        pass
+    def test_SoftMaxLayer_activate(self):
+        self.actual_Layer.normalize()
+        self.actual_Layer.activate()
+        self.actual_Layer.calc_net_values()
+        self.actual_S_Layer.normalize()
+        self.actual_S_Layer.activate()
+        self.assertLessEqual(self.actual_S_Layer.activated_values.max(), 1)
+        self.assertGreaterEqual(self.actual_S_Layer.activated_values.min(), 0)
 
     def test_Layer_calc_delta(self):
-        pass
-
-    def test_SoftMaxLayer_calc_delta(self):
-        pass
-
+        self.actual_Layer.normalize()
+        self.actual_Layer.activate()
+        self.actual_Layer.calc_net_values()
+        self.actual_S_Layer.normalize()
+        self.actual_S_Layer.activate()
+        # self.actual_S_Layer.calc_delta([3, 2, 1, 4])
+        # self.actual_Layer.calc_delta([])
+        # self.actual_weight.calc_grad()
+        # self.actual_weight.sgd()

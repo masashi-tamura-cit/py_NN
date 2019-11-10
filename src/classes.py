@@ -5,11 +5,11 @@ import sys
 
 
 class Weights:
-    def __init__(self, weight: np.ndarray, lag_layer, lead_layer):
+    def __init__(self, weight: np.ndarray, lead_layer, lag_layer):
         self.weight = weight  # 重み
         self.lag_layer = lag_layer  # Layer class object
         self.lead_layer = lead_layer  # Layer class object
-        self.gradients = np.zeros(weight.size)  # 本当は2次元で重みと同じ構造
+        self.gradients = np.array([])  # 本当は2次元で重みと同じ構造
 
     def calc_grad(self):
         self.gradients = np.dot(self.lag_layer.delta.T, self.lead_layer.activated_values).T / BATCH_SIZE
@@ -31,13 +31,14 @@ class Layer:
         self.test_nodes = np.array([])
 
     def normalize(self):
-        """
-        self.sd = []
-        for v in self.net_values.T:
-            self.sd.append(np.sqrt(np.var(v)))
-            v = (v - np.mean(v)) / self.sd[-1]
-        """
-        self.net_values = self.net_values/np.max(self.net_values)
+        # self.sd = []
+        # ave = []
+        # for v in self.net_values.T:
+        #    self.sd.append(np.sqrt(np.var(v)))
+        #    ave.append(np.ave(v))
+        # self.net_values = (self.net_values.T - ave) / self.sd
+        self.sd = np.sqrt(np.var(self.net_values))
+        self.net_values = (self.net_values - np.average(self.net_values)) / self.sd
 
     def activate(self):
         self.activated_values = np.where(self.net_values < 0, 0, self.net_values)
@@ -102,7 +103,7 @@ class NetWork:
     def __init_weight(self):
         for lead, lag in zip(self.layers[:-1], self.layers[1:]):
             arr = np.random.randn(lead.node_amount + 1, lag.node_amount) / np.sqrt(lead.node_amount + 1)
-            weight = Weights(arr, lag, lead)
+            weight = Weights(arr, lead, lag)
             lead.lag_weights = weight
             lag.lead_weights = weight
             self.weights.append(weight)
