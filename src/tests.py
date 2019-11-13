@@ -31,20 +31,13 @@ class TestNN(unittest.TestCase):
         self.assertEqual(self.actual_network.layers[1].lag_weights, self.actual_network.layers[2].lead_weights)
         self.assertEqual(self.actual_network.layers[2].lead_weights.lead_layer, self.actual_network.layers[1])
 
-    def test_Layer_norm(self):
-        self.actual_Layer.normalize()
-        self.assertEqual(0, np.average(self.actual_Layer.net_values))
-        self.assertEqual(1, np.var(self.actual_Layer.net_values))
-
     def test_Layer_activate(self):
-        self.actual_Layer.normalize()
         self.actual_Layer.activate()
         self.assertEqual(0, self.actual_Layer.activated_values.min())
         self.assertNotEqual(0, np.var(self.actual_Layer.activated_values))
         self.assertNotEqual(0, np.average(self.actual_Layer.activated_values))
 
     def test_Layer_calc_net_values(self):
-        self.actual_Layer.normalize()
         self.actual_Layer.activate()
         self.actual_Layer.calc_net_values()
         expect = np.dot(self.actual_Layer.activated_values[0], self.actual_weight.weight.T[0])
@@ -52,32 +45,22 @@ class TestNN(unittest.TestCase):
         self.assertEqual(self.actual_S_Layer.net_values[0][0], expect)
 
     def test_SoftMaxLayer_activate(self):
-        self.actual_Layer.normalize()
         self.actual_Layer.activate()
         self.actual_Layer.calc_net_values()
-        self.actual_S_Layer.normalize()
         self.actual_S_Layer.activate()
         self.assertLessEqual(self.actual_S_Layer.activated_values.max(), 1)
         self.assertGreaterEqual(self.actual_S_Layer.activated_values.min(), 0)
 
     def test_Layer_calc_delta(self):
-        self.actual_Layer.normalize()
         self.actual_Layer.activate()
         self.actual_Layer.calc_net_values()
-        self.actual_S_Layer.normalize()
         self.actual_S_Layer.activate()
-        s_norm_diff = self.actual_S_Layer.calc_delta([3, 2, 1, 4])
-        # norm_diff = self.actual_Layer.calc_delta([])
-        expect_s00 = self.actual_S_Layer.activated_values[0][0] * s_norm_diff[0][0]
-        expect_s12 = (self.actual_S_Layer.activated_values[1][2] - 1) * s_norm_diff[0][0]
-        self.assertEqual(self.actual_S_Layer.delta[0][0], expect_s00)
-        self.assertEqual(self.actual_S_Layer.delta[1][2], expect_s12)
+        # self.assertEqual(self.actual_S_Layer.delta[0][0], 0)
+        # self.assertEqual(self.actual_S_Layer.delta[1][2], 0)
 
     def test_Weight_calc_grad(self):
-        self.actual_Layer.normalize()
         self.actual_Layer.activate()
         self.actual_Layer.calc_net_values()
-        self.actual_S_Layer.normalize()
         self.actual_S_Layer.activate()
         self.actual_S_Layer.calc_delta([3, 2, 1, 4])
         self.actual_weight.calc_grad()

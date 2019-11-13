@@ -12,22 +12,29 @@ def main():
     # read_data
     time1 = time.time()
     train_data, train_label, test_data, test_label = read_mnist()
-    train_data = np.array(train_data) / 255.0
-    test_data = np.array(test_data) / 255.0
-    train_data, train_label = transform_data(train_data, train_label)
+    # train_data = np.array(train_data) / 255.0
+    # test_data = np.array(test_data) / 255.0
+    train_data, train_label = transform_data(np.array(train_data), train_label)
     # view_data(train_data[0][0], train_label[0][0])
     # view_data(test_data[0], test_label[0])
     model = NetWork(hidden_layer=2)
-    model.train_data = train_data
-    model.train_labels = train_label
-    time2 = time.time()
-    print("format_complete, time:{0}".format(time2 - time1))
-    model.training()
-    time3 = time.time()
-    print("train_end, time:{}".format(time3 - time2))
-    test_info = model.test(test_data, test_label)
-    print("test_end, time:{0}".format(time.time() - time3))
-    print("error_average:{0}, recognition_rate:{1}".format(test_info[1], test_info[0] * 100))
+    c = 0
+    while True:
+        model.train_data = train_data
+        model.train_labels = train_label
+        print("epoc{0} start".format(c))
+        c += 1
+        if c > 30:
+            break
+        # shuffle_data(train_data, train_label)
+        time2 = time.time()
+        print("format_complete, time:{0}".format(time2 - time1))
+        model.training()
+        time3 = time.time()
+        print("train_end, time:{}".format(time3 - time2))
+        test_info = model.test(test_data, test_label)
+        print("test_end, time:{0}".format(time.time() - time3))
+        print("error_average:{0}, recognition_rate:{1}".format(test_info[1], test_info[0] * 100))
 
 
 def read_mnist() -> tuple:
@@ -81,6 +88,16 @@ def transform_data(train_data: np.array, train_label: list) -> tuple:
     return_data = train_data.reshape((batch_num, BATCH_SIZE, dim))
     return_label = np.array(train_label).reshape((batch_num, BATCH_SIZE)).tolist()
     return return_data, return_label
+
+
+def shuffle_data(train_data: np.array, train_label: list) -> tuple:
+    """
+    受け取ったデータ配列とラベル配列の順番をランダムに入れ替える
+    :param train_data: データの3次元配列
+    :param train_label: ラベルの2次元配列
+    :return: ランダムに入れ替えたtrain_dataとそれに対応したtrain_label
+    """
+    merged_data = np.append(train_data.T, train_label)
 
 
 def view_data(data: np.array, data_label: int):

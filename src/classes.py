@@ -29,39 +29,23 @@ class Layer:
         self.lead_weights = None
         self.lag_weights = None
         self.delta = np.array([])
-        # self.sd = np.array([])
-        self.sd = 0
         self.test_nodes = np.array([])
 
-    def normalize(self):
-        # self.sd = []
-        # ave = []
-        # for v in self.net_values.T:
-        #    self.sd.append(np.sqrt(np.var(v)))
-        #    ave.append(np.ave(v))
-        # self.net_values = (self.net_values.T - ave) / self.sd
-        self.sd = np.sqrt(np.var(self.net_values))
-        self.net_values = (self.net_values - np.average(self.net_values)) / self.sd
-
     def activate(self):
-        self.activated_values = np.where(self.net_values < 0, 0, self.net_values)
+        self.activated_values = 1/(1 + np.exp(-self.net_values))
         self.activated_values = np.reshape(np.append(self.activated_values.T, np.ones(BATCH_SIZE)),
                                            (self.node_amount + 1, BATCH_SIZE)).T
 
     def calc_net_values(self):
         self.lag_weights.lag_layer.net_values = np.dot(self.activated_values, self.lag_weights.weight)
 
-    def calc_delta(self, labels: list) -> np.array:
-        nsd = self.net_values.size * self.sd
-        norm_diff = (self.net_values * self.net_values) * (-1 / nsd) + ((1 - self.net_values.size) / nsd)
+    def calc_delta(self, labels: list):
         round_z = np.dot(self.lag_weights.lag_layer.delta, self.lag_weights.weight[:-1].T)
-        self.delta = round_z * np.where(round_z < 0, 0, 1) * norm_diff
-        return norm_diff
+        self.delta = round_z * (1 - self.activated_values.T[:-1].T) * self.activated_values.T[:-1].T
 
     def forward(self):
         v = self.test_nodes
-        v = (v - np.average(v)) / np.sqrt(np.var(v))
-        v = np.where(v < 0, 0, v)  # activate
+        v = 1 / (1 + np.exp(-v))  # activate
         v = np.append(v, 1)  # add_bias_node
         self.lag_weights.lag_layer.test_nodes = np.dot(v, self.lag_weights.weight)  # calc_lag_values
 
@@ -76,19 +60,15 @@ class SoftMaxLayer(Layer):
 
     def calc_delta(self, labels: list) -> np.array:
         delta_arr = np.array(list(self.activated_values))  # avoid_update_activated_value
-        nsd = self.net_values.size * self.sd
-        norm_diff = ((self.net_values * self.net_values) * (-1 / nsd)) + ((1 - self.net_values.size) / nsd)
         for i, delta in zip(labels, delta_arr):
             delta[i] = delta[i] - 1
-        self.delta = np.array(delta_arr) * norm_diff
-        return norm_diff
+        self.delta = np.array(delta_arr)
 
     def calc_net_values(self):
         pass
 
     def forward(self):
         v = self.test_nodes
-        v = (v - np.average(v)) / np.sqrt(np.var(v))
         v = np.exp(v - v.max())
         self.test_nodes = v / np.sum(v)
 
@@ -132,7 +112,6 @@ class NetWork:
             self.layers[0].net_values = np.array(item)
             # forward operation
             for layer in self.layers:
-                layer.normalize()
                 layer.activate()
                 layer.calc_net_values()
             # calc_error
@@ -155,4 +134,5 @@ class NetWork:
             if self.layers[-1].test_nodes.argmax() == t:
                 recognition_late += 1
             error_average += -(math.log(self.layers[-1].test_nodes[t], math.e))
+
         return recognition_late / len(test_labels), error_average / len(test_labels)
