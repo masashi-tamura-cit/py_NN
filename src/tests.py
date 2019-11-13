@@ -2,6 +2,7 @@ import unittest
 import numpy as np
 from classes import *
 from consts import *
+# BATCH_SIZE = 4
 
 
 class TestNN(unittest.TestCase):
@@ -10,11 +11,11 @@ class TestNN(unittest.TestCase):
     actual_network = NetWork(val)
     actual_Layer = Layer(val)
     actual_Layer.net_values = np.arange(0, BATCH_SIZE*val).reshape(BATCH_SIZE, val)
-    s_val = 4
+    s_val = 10
     actual_S_Layer = SoftMaxLayer(s_val)
     actual_weight = Weights(np.ones((val + 1, s_val)), actual_Layer, actual_S_Layer)
     actual_Layer.lag_weights = actual_weight
-    actual_S_Layer.lead_weights = actual_S_Layer
+    actual_S_Layer.lead_weights = actual_weight
 
     def test_Layer_constructor(self):
         self.assertEqual(self.val, self.actual_Layer.node_amount)
@@ -57,13 +58,23 @@ class TestNN(unittest.TestCase):
         self.assertLessEqual(self.actual_S_Layer.activated_values.max(), 1)
         self.assertGreaterEqual(self.actual_S_Layer.activated_values.min(), 0)
 
+    def test_S_Layer_calc_delta(self):
+        self.actual_Layer.normalize()
+        self.actual_Layer.activate()
+        self.actual_Layer.calc_net_values()
+        self.actual_S_Layer.normalize()
+        self.actual_S_Layer.activate()
+        self.actual_S_Layer.calc_delta([3, 2, 1, 4])
+        self.assertEqual(self.actual_S_Layer.delta.size, self.actual_S_Layer.activated_values.size)
+
     def test_Layer_calc_delta(self):
         self.actual_Layer.normalize()
         self.actual_Layer.activate()
         self.actual_Layer.calc_net_values()
         self.actual_S_Layer.normalize()
         self.actual_S_Layer.activate()
-        # self.actual_S_Layer.calc_delta([3, 2, 1, 4])
-        # self.actual_Layer.calc_delta([])
-        # self.actual_weight.calc_grad()
-        # self.actual_weight.sgd()
+        self.actual_S_Layer.calc_delta([3, 2, 1, 4])
+        self.actual_Layer.calc_delta([])
+        self.actual_weight.calc_grad()
+        self.assertEqual(self.actual_S_Layer.lead_weights.gradients.size, self.actual_Layer.lag_weights.weight.size)
+        #  self.actual_weight.sgd()

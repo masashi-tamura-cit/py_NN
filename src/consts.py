@@ -1,13 +1,13 @@
 import os
 # Network params
-BATCH_SIZE = 4
+BATCH_SIZE = 32
 DIM = 784
 MD1 = 50
 MD2 = 100
 CLASS_NUM = 10
 
 # Hyper params
-ETA = 0.005
+ETA = 0.01
 
 # Dataset
 dataset = 0
