@@ -1,6 +1,6 @@
 import os
 # Network params
-BATCH_SIZE = 32
+BATCH_SIZE = 4
 DIM = 784
 MD1 = 50
 MD2 = 100

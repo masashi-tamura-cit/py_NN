@@ -47,7 +47,9 @@ class TestNN(unittest.TestCase):
         self.actual_Layer.normalize()
         self.actual_Layer.activate()
         self.actual_Layer.calc_net_values()
+        expect = np.dot(self.actual_Layer.activated_values[0], self.actual_weight.weight.T[0])
         self.assertEqual(self.actual_S_Layer.net_values.size, BATCH_SIZE * self.s_val)
+        self.assertEqual(self.actual_S_Layer.net_values[0][0], expect)
 
     def test_SoftMaxLayer_activate(self):
         self.actual_Layer.normalize()
@@ -58,23 +60,29 @@ class TestNN(unittest.TestCase):
         self.assertLessEqual(self.actual_S_Layer.activated_values.max(), 1)
         self.assertGreaterEqual(self.actual_S_Layer.activated_values.min(), 0)
 
-    def test_S_Layer_calc_delta(self):
-        self.actual_Layer.normalize()
-        self.actual_Layer.activate()
-        self.actual_Layer.calc_net_values()
-        self.actual_S_Layer.normalize()
-        self.actual_S_Layer.activate()
-        self.actual_S_Layer.calc_delta([3, 2, 1, 4])
-        self.assertEqual(self.actual_S_Layer.delta.size, self.actual_S_Layer.activated_values.size)
-
     def test_Layer_calc_delta(self):
         self.actual_Layer.normalize()
         self.actual_Layer.activate()
         self.actual_Layer.calc_net_values()
         self.actual_S_Layer.normalize()
         self.actual_S_Layer.activate()
+        s_norm_diff = self.actual_S_Layer.calc_delta([3, 2, 1, 4])
+        # norm_diff = self.actual_Layer.calc_delta([])
+        expect_s00 = self.actual_S_Layer.activated_values[0][0] * s_norm_diff[0][0]
+        expect_s12 = (self.actual_S_Layer.activated_values[1][2] - 1) * s_norm_diff[0][0]
+        self.assertEqual(self.actual_S_Layer.delta[0][0], expect_s00)
+        self.assertEqual(self.actual_S_Layer.delta[1][2], expect_s12)
+
+    def test_Weight_calc_grad(self):
+        self.actual_Layer.normalize()
+        self.actual_Layer.activate()
+        self.actual_Layer.calc_net_values()
+        self.actual_S_Layer.normalize()
+        self.actual_S_Layer.activate()
         self.actual_S_Layer.calc_delta([3, 2, 1, 4])
-        self.actual_Layer.calc_delta([])
         self.actual_weight.calc_grad()
-        self.assertEqual(self.actual_S_Layer.lead_weights.gradients.size, self.actual_Layer.lag_weights.weight.size)
+        lead = self.actual_Layer.activated_values.T[0]
+        lag = self.actual_S_Layer.delta.T[0]
+        round_w_00 = np.dot(lead, lag.T)/BATCH_SIZE
+        self.assertEqual(self.actual_weight.gradients[0][0], round_w_00)
         #  self.actual_weight.sgd()

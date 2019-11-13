@@ -2,6 +2,7 @@ import random
 from consts import *
 import numpy as np
 import math
+from main import view_data as vd
 import sys
 
 
@@ -50,11 +51,12 @@ class Layer:
     def calc_net_values(self):
         self.lag_weights.lag_layer.net_values = np.dot(self.activated_values, self.lag_weights.weight)
 
-    def calc_delta(self, labels: list):
+    def calc_delta(self, labels: list) -> np.array:
         nsd = self.net_values.size * self.sd
-        norm_diff = (self.net_values * self.net_values) * (-1 / nsd) + ((1 - self.net_values.size)/nsd)
+        norm_diff = (self.net_values * self.net_values) * (-1 / nsd) + ((1 - self.net_values.size) / nsd)
         round_z = np.dot(self.lag_weights.lag_layer.delta, self.lag_weights.weight[:-1].T)
         self.delta = round_z * np.where(round_z < 0, 0, 1) * norm_diff
+        return norm_diff
 
     def forward(self):
         v = self.test_nodes
@@ -72,13 +74,14 @@ class SoftMaxLayer(Layer):
             value_arr.append(e / np.sum(e))
         self.activated_values = np.array(value_arr)
 
-    def calc_delta(self, labels: list):
-        delta_arr = self.activated_values
+    def calc_delta(self, labels: list) -> np.array:
+        delta_arr = np.array(list(self.activated_values))  # avoid_update_activated_value
         nsd = self.net_values.size * self.sd
-        norm_diff = ((self.net_values * self.net_values) * (-1 / nsd)) + ((1 - self.net_values.size)/nsd)
+        norm_diff = ((self.net_values * self.net_values) * (-1 / nsd)) + ((1 - self.net_values.size) / nsd)
         for i, delta in zip(labels, delta_arr):
             delta[i] = delta[i] - 1
         self.delta = np.array(delta_arr) * norm_diff
+        return norm_diff
 
     def calc_net_values(self):
         pass
@@ -119,8 +122,12 @@ class NetWork:
 
     def training(self):
         data_size = np.array(self.train_labels).size
+        flag = 0
         self.train_data_error = 0
         for item, key in zip(self.train_data, self.train_labels):
+            if flag < 5:
+                # vd(np.array(item[0]), key[0])
+                flag += 1
             # input_data_to_input_layer
             self.layers[0].net_values = np.array(item)
             # forward operation
