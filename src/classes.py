@@ -2,7 +2,7 @@ import random
 from consts import *
 import numpy as np
 import math
-from main import view_data as vd
+# from main import view_data as vd
 import sys
 
 
@@ -89,7 +89,7 @@ class NetWork:
         self.__init_weight()
         self.train_data_error = 0.0
         self.train_data = np.array([])
-        self.train_labels = np.array([])
+        self.train_label = np.array([])
 
     def __init_weight(self):
         for lead, lag in zip(self.layers[:-1], self.layers[1:]):
@@ -100,14 +100,12 @@ class NetWork:
             self.weights.append(weight)
         self.layers[-1].lead_weights.weight = self.layers[-1].lead_weights.weight * np.sqrt(2.0)
 
-    def training(self):
-        data_size = np.array(self.train_labels).size
-        flag = 0
+    def training(self, train_data, train_label):
+        self.train_data = train_data
+        self.train_label = train_label
+        data_size = np.array(self.train_label).size
         self.train_data_error = 0
-        for item, key in zip(self.train_data, self.train_labels):
-            if flag < 5:
-                # vd(np.array(item[0]), key[0])
-                flag += 1
+        for item, key in zip(self.train_data, self.train_label):
             # input_data_to_input_layer
             self.layers[0].net_values = np.array(item)
             # forward operation
@@ -115,8 +113,8 @@ class NetWork:
                 layer.activate()
                 layer.calc_net_values()
             # calc_error
-            for v, data_label in zip(self.layers[-1].activated_values, key):
-                self.train_data_error += -math.log(v[data_label], math.e) / data_size
+            for v, label in zip(self.layers[-1].activated_values, key):
+                self.train_data_error += -math.log(v[label], math.e) / data_size
             # back propagation
             for layer in reversed(self.layers):
                 layer.calc_delta(key)
@@ -127,12 +125,12 @@ class NetWork:
     def test(self, test_data: np.array, test_labels: list) -> tuple:
         recognition_late = 0
         error_average = 0
-        for t, data in zip(test_labels, test_data):
+        for label, data in zip(test_labels, test_data):
             self.layers[0].test_nodes = np.array(data)
             for layer in self.layers:
                 layer.forward()
-            if self.layers[-1].test_nodes.argmax() == t:
+            if self.layers[-1].test_nodes.argmax() == label:
                 recognition_late += 1
-            error_average += -(math.log(self.layers[-1].test_nodes[t], math.e))
+            error_average += -(math.log(self.layers[-1].test_nodes[label], math.e))
 
         return recognition_late / len(test_labels), error_average / len(test_labels)
