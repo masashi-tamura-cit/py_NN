@@ -31,10 +31,10 @@ class Layer:
         self.delta = np.array([])
         self.test_nodes = np.array([])
 
-    def activate(self):
+    def activate(self, batch_size: int):
         self.activated_values = 1/(1 + np.exp(-self.net_values))
-        self.activated_values = np.reshape(np.append(self.activated_values.T, np.ones(BATCH_SIZE)),
-                                           (self.node_amount + 1, BATCH_SIZE)).T
+        self.activated_values = np.reshape(np.append(self.activated_values.T, np.ones(batch_size)),
+                                           (self.node_amount + 1, batch_size)).T
 
     def calc_net_values(self):
         self.lag_weights.lag_layer.net_values = np.dot(self.activated_values, self.lag_weights.weight)
@@ -51,7 +51,7 @@ class Layer:
 
 
 class SoftMaxLayer(Layer):
-    def activate(self):
+    def activate(self, batch_size: int):
         value_arr = []
         for values in self.net_values:
             e = np.exp(values - values.max())
@@ -74,22 +74,22 @@ class SoftMaxLayer(Layer):
 
 
 class NetWork:
-    def __init__(self, hidden_layer: int):
+    def __init__(self, hidden_layer: int, input_dim: int):
         self.hidden_layer = hidden_layer
         if hidden_layer < 2:
             self.hidden_layer = 2
 
         self.layers = []
-        self.layers.append(Layer(DIM))
+        self.layers.append(Layer(input_dim))
         for i in range(hidden_layer - 1):
             self.layers.append(Layer(MD1))
         self.layers.append(Layer(MD2))
         self.layers.append(SoftMaxLayer(CLASS_NUM))
         self.weights = []
         self.__init_weight()
-        self.train_data_error = 0.0
-        self.train_data = np.array([])
-        self.train_label = np.array([])
+        self.data_error = 0.0
+        self.data = np.array([])
+        self.labels = np.array([])
 
     def __init_weight(self):
         for lead, lag in zip(self.layers[:-1], self.layers[1:]):
@@ -100,21 +100,21 @@ class NetWork:
             self.weights.append(weight)
         self.layers[-1].lead_weights.weight = self.layers[-1].lead_weights.weight * np.sqrt(2.0)
 
-    def training(self, train_data, train_label):
-        self.train_data = train_data
-        self.train_label = train_label
-        data_size = np.array(self.train_label).size
-        self.train_data_error = 0
-        for item, key in zip(self.train_data, self.train_label):
+    def training(self, train_data, labels):
+        self.data = train_data
+        self.labels = labels
+        data_size = np.array(self.labels).size
+        self.data_error = 0
+        for item, key in zip(self.data, self.labels):
             # input_data_to_input_layer
             self.layers[0].net_values = np.array(item)
             # forward operation
             for layer in self.layers:
-                layer.activate()
+                layer.activate(BATCH_SIZE)
                 layer.calc_net_values()
             # calc_error
             for v, label in zip(self.layers[-1].activated_values, key):
-                self.train_data_error += -math.log(v[label], math.e) / data_size
+                self.data_error += -math.log(v[label], math.e) / data_size
             # back propagation
             for layer in reversed(self.layers):
                 layer.calc_delta(key)
@@ -123,14 +123,19 @@ class NetWork:
                 weight.sgd()  # optimizer
 
     def test(self, test_data: np.array, test_labels: list) -> tuple:
-        recognition_late = 0
-        error_average = 0
-        for label, data in zip(test_labels, test_data):
-            self.layers[0].test_nodes = np.array(data)
-            for layer in self.layers:
-                layer.forward()
-            if self.layers[-1].test_nodes.argmax() == label:
-                recognition_late += 1
-            error_average += -(math.log(self.layers[-1].test_nodes[label], math.e))
+        accuracy = 0.0
+        error_average = 0.0
+        self.data = test_data
+        self.layers[0].net_values = test_data
+        self.labels = test_labels
 
-        return recognition_late / len(test_labels), error_average / len(test_labels)
+        print(self.data.shape)
+        data_amount = len(self.labels)
+        for layer in self.layers:
+            layer.activate(data_amount)
+            layer.calc_net_values()
+        for v, label in zip(self.layers[-1].activated_values, self.labels):
+            if np.argmax(v) == label:
+                accuracy += 1.0/data_amount
+                error_average += -math.log(v[label], math.e) / data_amount
+        return accuracy, error_average

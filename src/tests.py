@@ -8,7 +8,7 @@ from consts import *
 class TestNN(unittest.TestCase):
     print("setup test case")
     val = 5
-    actual_network = NetWork(val)
+    actual_network = NetWork(val, 10)
     actual_Layer = Layer(val)
     actual_Layer.net_values = np.arange(0, BATCH_SIZE*val).reshape(BATCH_SIZE, val)
     s_val = 10
@@ -25,7 +25,7 @@ class TestNN(unittest.TestCase):
         self.assertEqual(ex, self.actual_network.hidden_layer)
         self.assertEqual(ex + 2, len(self.actual_network.layers))
         self.assertEqual(None, self.actual_network.layers[0].lead_weights)
-        self.assertEqual((DIM + 1) * MD1, self.actual_network.layers[0].lag_weights.weight.size)
+        self.assertEqual((10 + 1) * MD1, self.actual_network.layers[0].lag_weights.weight.size)
         self.assertEqual((MD2 + 1) * CLASS_NUM, self.actual_network.layers[-1].lead_weights.weight.size)
         self.assertEqual(None, self.actual_network.layers[-1].lag_weights)
         self.assertEqual(self.actual_network.layers[1].lag_weights, self.actual_network.layers[2].lead_weights)

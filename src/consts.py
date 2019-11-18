@@ -1,9 +1,8 @@
 import os
 # Network params
 BATCH_SIZE = 32
-DIM = 3072
-MD1 = 500
-MD2 = 1000
+MD1 = 50
+MD2 = 10
 CLASS_NUM = 10
 
 # Hyper params

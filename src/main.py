@@ -13,12 +13,10 @@ import random
 def main():
     # read_data
     time1 = time.time()
-    train_data, train_label, test_data, test_label = read_cifar10()
-    # view_cifar(train_data[0], train_label[0])
-    # train_data, train_label, test_data, test_label = read_mnist()
-    # view_mnist(train_data[0], train_label[0])
-    # view_data(test_data[0], test_label[0])
-    model = NetWork(hidden_layer=3)
+    # train_data, train_label, test_data, test_label = read_cifar10()
+    train_data, train_label, test_data, test_label = read_mnist()
+    # model = NetWork(hidden_layer=2, input_dim=3072)  # CIFAR
+    model = NetWork(hidden_layer=2, input_dim=784)  # MNIST
     time2 = time.time()
     print("format_complete time:{0}".format(time2 - time1))
     accuracy = []
