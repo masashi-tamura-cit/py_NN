@@ -30,9 +30,21 @@ class Layer:
         self.lag_weights = None
         self.delta = np.array([])
         self.test_nodes = np.array([])
+        self.sd = []
 
-    def activate(self, batch_size: int):
-        self.activated_values = 1/(1 + np.exp(-self.net_values))
+    def normalize(self):
+        var = []
+        ave = []
+        for v in self.net_values.T:
+            var.append(np.var(v) + 0.0001)  # avoid 0 divide
+            ave.append(np.average(v))
+        self.sd = np.sqrt(var)
+        self.net_values = (self.net_values - ave) / self.sd
+
+    def activate(self):
+        batch_size = self.net_values.shape[0]
+        # self.activated_values = 1/(1 + np.exp(-self.net_values))
+        self.activated_values = np.where(self.net_values < 0, 0, self.net_values)
         self.activated_values = np.reshape(np.append(self.activated_values.T, np.ones(batch_size)),
                                            (self.node_amount + 1, batch_size)).T
 
@@ -40,18 +52,31 @@ class Layer:
         self.lag_weights.lag_layer.net_values = np.dot(self.activated_values, self.lag_weights.weight)
 
     def calc_delta(self, labels: list):
+        norm_diff = (1/(BATCH_SIZE * self.sd))*(BATCH_SIZE - pow(self.net_values, 2) - 1)
+        round_z = self.lag_weights.lag_layer.delta.dot(self.lag_weights.weight[:-1].T) * norm_diff
+        self.delta = round_z * np.where(self.net_values <= 0, 0, 1)
+
+
+class SigmoidLayer(Layer):
+    def normalize(self):
+        pass
+
+    def activate(self):
+        batch_size = self.net_values.shape[0]
+        self.activated_values = 1/(1 + np.exp(-self.net_values))
+        self.activated_values = np.reshape(np.append(self.activated_values.T, np.ones(batch_size)),
+                                           (self.node_amount + 1, batch_size)).T
+
+    def calc_delta(self, labels: list):
         round_z = np.dot(self.lag_weights.lag_layer.delta, self.lag_weights.weight[:-1].T)
         self.delta = round_z * (1 - self.activated_values.T[:-1].T) * self.activated_values.T[:-1].T
 
-    def forward(self):
-        v = self.test_nodes
-        v = 1 / (1 + np.exp(-v))  # activate
-        v = np.append(v, 1)  # add_bias_node
-        self.lag_weights.lag_layer.test_nodes = np.dot(v, self.lag_weights.weight)  # calc_lag_values
-
 
 class SoftMaxLayer(Layer):
-    def activate(self, batch_size: int):
+    def normalize(self):
+        pass  # ReLUのときはコメントアウト
+
+    def activate(self):
         value_arr = []
         for values in self.net_values:
             e = np.exp(values - values.max())
@@ -59,18 +84,15 @@ class SoftMaxLayer(Layer):
         self.activated_values = np.array(value_arr)
 
     def calc_delta(self, labels: list) -> np.array:
+        # norm_diff = (1/(BATCH_SIZE * self.sd))*(BATCH_SIZE - pow(self.net_values, 2) - 1)
+        norm_diff = 1
         delta_arr = np.array(list(self.activated_values))  # avoid_update_activated_value
         for i, delta in zip(labels, delta_arr):
             delta[i] = delta[i] - 1
-        self.delta = np.array(delta_arr)
+        self.delta = np.array(delta_arr) * norm_diff
 
     def calc_net_values(self):
         pass
-
-    def forward(self):
-        v = self.test_nodes
-        v = np.exp(v - v.max())
-        self.test_nodes = v / np.sum(v)
 
 
 class NetWork:
@@ -80,10 +102,17 @@ class NetWork:
             self.hidden_layer = 2
 
         self.layers = []
-        self.layers.append(Layer(input_dim))
-        for i in range(hidden_layer - 1):
-            self.layers.append(Layer(MD1))
-        self.layers.append(Layer(MD2))
+        if ACTIVATE == SIGMOID:
+            self.layers.append(SigmoidLayer(input_dim))
+            for i in range(hidden_layer - 1):
+                self.layers.append(SigmoidLayer(MD1))
+            self.layers.append(SigmoidLayer(MD2))
+        if ACTIVATE == ReLU:
+            self.layers.append(Layer(input_dim))
+            for i in range(hidden_layer - 1):
+                self.layers.append(Layer(MD1))
+            self.layers.append(Layer(MD2))
+
         self.layers.append(SoftMaxLayer(CLASS_NUM))
         self.weights = []
         self.__init_weight()
@@ -110,7 +139,8 @@ class NetWork:
             self.layers[0].net_values = np.array(item)
             # forward operation
             for layer in self.layers:
-                layer.activate(BATCH_SIZE)
+                layer.normalize()
+                layer.activate()
                 layer.calc_net_values()
             # calc_error
             for v, label in zip(self.layers[-1].activated_values, key):
@@ -129,13 +159,13 @@ class NetWork:
         self.layers[0].net_values = test_data
         self.labels = test_labels
 
-        print(self.data.shape)
-        data_amount = len(self.labels)
+        data_amount = len(test_labels)
         for layer in self.layers:
-            layer.activate(data_amount)
+            layer.normalize()
+            layer.activate()
             layer.calc_net_values()
         for v, label in zip(self.layers[-1].activated_values, self.labels):
             if np.argmax(v) == label:
                 accuracy += 1.0/data_amount
-                error_average += -math.log(v[label], math.e) / data_amount
+            error_average += -math.log(v[label], math.e) / data_amount
         return accuracy, error_average

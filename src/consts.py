@@ -1,8 +1,8 @@
 import os
 # Network params
 BATCH_SIZE = 32
-MD1 = 50
-MD2 = 10
+MD1 = 500
+MD2 = 2 * MD1
 CLASS_NUM = 10
 
 # Hyper params
@@ -18,7 +18,7 @@ DataAmount = 4
 TestAmount = 5
 # DATA_DIR = os.path.join(os.getcwd(), "data")
 DATA_DIR = 'C:\\Users\\tamtam\\PycharmProjects\\untitled\\src\\data'
-SAMPLE_SIZE = 32000
+SAMPLE_SIZE = 8192
 
 MNIST = {
     DataSet: "MNIST",
@@ -40,8 +40,7 @@ CIFAR100 = {DataSet: "CIFAR100", FileName: ["train.bin", "test.bin"]}
 
 ReLU = 0
 SIGMOID = 1
-ACTIVATE = ReLU
-BATCH_NORM = True
+ACTIVATE = SIGMOID
 
 SGD = 0
 MomentumSGD = 1

@@ -15,11 +15,12 @@ def main():
     time1 = time.time()
     # train_data, train_label, test_data, test_label = read_cifar10()
     train_data, train_label, test_data, test_label = read_mnist()
-    # model = NetWork(hidden_layer=2, input_dim=3072)  # CIFAR
+    # model = NetWork(hidden_layer=3, input_dim=3072)  # CIFAR
     model = NetWork(hidden_layer=2, input_dim=784)  # MNIST
     time2 = time.time()
     print("format_complete time:{0}".format(time2 - time1))
     accuracy = []
+    err = []
     c = 0
     while True:
         time3 = time.time()
@@ -29,19 +30,21 @@ def main():
         model.training(data, label)
         time4 = time.time()
         print("train_end, time:{}".format(time4 - time3))
-        test_info = model.test(test_data[:1024], test_label[:1024])
+        test_info = model.test(test_data[:100], test_label[:100])
         time5 = time.time()
         print("test_end, time:{0}".format(time5 - time4))
-        print("error_average:{0}, accuracy:{1}".format(test_info[1], test_info[0] * 100))
+        print("error_average:{0}, accuracy:{1}".format(test_info[1], int(test_info[0] * 100)))
         accuracy.append(test_info[0])
+        err.append(test_info[1])
         c += 1
         if early_stopping(c):
             break
     print("\ntotal_train_time:{0}".format(time5 - time2))
     print("total_epoc:{0}".format(c))
-    print("latest accuracy:{0}".format(test_info[0]))
+    print("latest accuracy:{0}%".format(test_info[0]))
     print("latest error:{0}".format(test_info[1]))
-    plt.plot(list(range(0, c, 1)), accuracy)
+    plt.plot(list(range(0, c, 1)), accuracy, linestyle="solid")
+    plt.plot(list(range(0, c, 1)), err, linestyle="dashed")
     plt.show()
 
 
