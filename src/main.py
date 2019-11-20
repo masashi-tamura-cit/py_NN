@@ -4,7 +4,7 @@ import time
 from classes import *
 import numpy as np
 from matplotlib import pyplot as plt
-from matplotlib import lines
+import itertools
 from PIL import Image
 import math
 import random
@@ -13,38 +13,58 @@ import random
 def main():
     # read_data
     time1 = time.time()
-    # train_data, train_label, test_data, test_label = read_cifar10()
-    train_data, train_label, test_data, test_label = read_mnist()
-    # model = NetWork(hidden_layer=3, input_dim=3072)  # CIFAR
-    model = NetWork(hidden_layer=2, input_dim=784)  # MNIST
+    if DATASET[DataSet] == "MNIST":
+        train_data, train_label, test_data, test_label = read_mnist()
+    # if DATASET[DataSet] == "CIFAR10":
+    else:
+        train_data, train_label, test_data, test_label = read_cifar10()
+
+    model = NetWork(hidden_layer=2, input_dim=DATASET[DataLength], activation=ReLU, optimizer=SGD)
     time2 = time.time()
     print("format_complete time:{0}".format(time2 - time1))
-    accuracy = []
-    err = []
+    all_accuracy = []
+    all_err = []
+
     c = 0
     while True:
-        time3 = time.time()
-        print("epoc{0} train_start".format(c))
-        data, label = shuffle_data(train_data[:SAMPLE_SIZE], train_label[:SAMPLE_SIZE])
-        data, label = transform_data(data, label)
-        model.training(data, label)
-        time4 = time.time()
-        print("train_end, time:{}".format(time4 - time3))
-        test_info = model.test(test_data[:100], test_label[:100])
-        time5 = time.time()
-        print("test_end, time:{0}".format(time5 - time4))
-        print("error_average:{0}, accuracy:{1}".format(test_info[1], int(test_info[0] * 100)))
-        accuracy.append(test_info[0])
-        err.append(test_info[1])
-        c += 1
-        if early_stopping(c):
+        accuracy = []
+        err = []
+        while not early_stopping(err):
+            time3 = time.time()
+            print("epoc{0} train_start".format(c))
+            data, label = shuffle_data(train_data[:SAMPLE_SIZE], train_label[:SAMPLE_SIZE])
+            data, label = transform_data(data, label)
+            model.training(data, label)
+            time4 = time.time()
+            print("train_end, time:{}".format(time4 - time3))
+            test_info = model.test(test_data[:VALIDATION_DATA], test_label[:VALIDATION_DATA])
+            time5 = time.time()
+            print("test_end, time:{0}".format(time5 - time4))
+            print("error_average:{0}, accuracy:{1}%".format(test_info[1], int(test_info[0] * 100)))
+            accuracy.append(test_info[0])
+            err.append(test_info[1])
+            c += 1
+        all_accuracy.append(accuracy)
+        all_err.append(err)
+        if model.is_proved(err):
+            model.add_layer()
+            print("add_layer")
+        else:
             break
     print("\ntotal_train_time:{0}".format(time5 - time2))
     print("total_epoc:{0}".format(c))
-    print("latest accuracy:{0}%".format(test_info[0]))
+    print("latest accuracy:{0}%".format(int(test_info[0]*100)))
     print("latest error:{0}".format(test_info[1]))
-    plt.plot(list(range(0, c, 1)), accuracy, linestyle="solid")
-    plt.plot(list(range(0, c, 1)), err, linestyle="dashed")
+    accuracy = list(itertools.chain.from_iterable(all_accuracy))
+    err = list(itertools.chain.from_iterable(all_err))
+
+    plt.subplot(2, 1, 1)
+    plt.plot(list(range(0, c, 1)), accuracy)
+    plt.title("accuracy")
+    plt.ylim(0, 1)
+    plt.subplot(2, 1, 2)
+    plt.plot(list(range(0, c, 1)), err)
+    plt.title("error")
     plt.show()
 
 
@@ -113,7 +133,7 @@ def read_mnist() -> tuple:
     return np.array(train_data), train_label, np.array(test_data), test_label
 
 
-def transform_data(train_data: np.array, train_label: list) -> tuple:
+def transform_data(train_data: np.array, train_label: np.array) -> tuple:
     """
     データを3次元配列に整形する np.array([[[],[],[]],[[],[],[]]]) 的なイメージ
     :param train_data: 学習データの2次元配列
@@ -123,7 +143,7 @@ def transform_data(train_data: np.array, train_label: list) -> tuple:
     dim = int(train_data[0].size)
     batch_num = int(train_data.size/(BATCH_SIZE * dim))
     return_data = train_data.reshape((batch_num, BATCH_SIZE, dim))
-    return_label = np.array(train_label).reshape((batch_num, BATCH_SIZE)).tolist()
+    return_label = train_label.reshape((batch_num, BATCH_SIZE)).tolist()
     return return_data, return_label
 
 
@@ -134,11 +154,10 @@ def shuffle_data(data: np.array, label: list) -> tuple:
     :param label: ラベルの配列
     :return: ランダムに入れ替えたtrain_dataとそれに対応したtrain_label
     """
-    shape = data.shape
-    array = np.reshape(np.append(data.T, label), (shape[1] + 1, shape[0])).T.tolist()
+    array = np.vstack((data.T, label)).T.tolist()
     array = np.array(random.sample(array, SAMPLE_SIZE))
     return_data = array.T[:-1].T
-    return_label = list(array.T[-1])
+    return_label = array.T[-1]
 
     return return_data, return_label
 
@@ -185,8 +204,11 @@ def view_cifar(data: np.array, label: int) -> None:
     img.show()
 
 
-def early_stopping(counter: int) -> bool:
-    if counter < EarlyStopping:
+def early_stopping(err: list) -> bool:
+    if not err:
+        return False
+    arg_min = np.argmin(np.array(err))
+    if (len(err) - arg_min) < EARLY_STOPPING_EPOC:
         return False
     return True
 

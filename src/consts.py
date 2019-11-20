@@ -1,13 +1,6 @@
 import os
 # Network params
-BATCH_SIZE = 32
-MD1 = 500
-MD2 = 2 * MD1
 CLASS_NUM = 10
-
-# Hyper params
-ETA = 0.01
-EarlyStopping = 50
 
 # Dataset
 DataSet = 0
@@ -18,7 +11,6 @@ DataAmount = 4
 TestAmount = 5
 # DATA_DIR = os.path.join(os.getcwd(), "data")
 DATA_DIR = 'C:\\Users\\tamtam\\PycharmProjects\\untitled\\src\\data'
-SAMPLE_SIZE = 8192
 
 MNIST = {
     DataSet: "MNIST",
@@ -40,9 +32,21 @@ CIFAR100 = {DataSet: "CIFAR100", FileName: ["train.bin", "test.bin"]}
 
 ReLU = 0
 SIGMOID = 1
-ACTIVATE = SIGMOID
-
 SGD = 0
 MomentumSGD = 1
 Adam = 2
-OPTIMIZER = SGD
+
+# settings
+DATASET = MNIST
+BATCH_SIZE = 32
+MD1 = 500
+MD2 = 2 * MD1
+SAMPLE_SIZE = 3200
+VALIDATION_DATA = 1000
+EARLY_STOPPING_EPOC = 5
+# optimizer params
+ETA = 0.01
+ALPHA = 0.001
+BETA1 = 0.9
+BETA2 = 0.999
+EPS = pow(10, -8)
