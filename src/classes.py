@@ -60,18 +60,16 @@ class Layer:
 
     def activate(self):
         batch_size = self.net_values.shape[0]
-        self.activated_values = np.where(self.net_values < 0, 0, self.net_values)
-        # self.activated_values = np.reshape(np.append(self.activated_values.T, np.ones(batch_size)),
-        #                                   (self.node_amount + 1, batch_size)).T
+        self.activated_values = np.where(self.net_values < 0, 0, self.net_values/10)
         self.activated_values = np.vstack((self.activated_values.T, np.ones(batch_size))).T
 
     def calc_net_values(self):
         self.lag_weights.lag_layer.net_values = np.dot(self.activated_values, self.lag_weights.weight)
 
     def calc_delta(self, labels: list):
-        norm_diff = (1/(BATCH_SIZE * self.sd))*(BATCH_SIZE - np.power(self.net_values, 2) - 1)
+        norm_diff = (1/(BATCH_SIZE * self.sd))*(BATCH_SIZE - (self.net_values ** 2) - 1)
         round_z = self.lag_weights.lag_layer.delta.dot(self.lag_weights.weight[:-1].T) * norm_diff
-        self.delta = round_z * np.where(self.net_values <= 0, 0, 1)
+        self.delta = round_z * np.where(self.net_values <= 0, 0, 1/10)
 
 
 class SigmoidLayer(Layer):
@@ -81,8 +79,6 @@ class SigmoidLayer(Layer):
     def activate(self):
         batch_size = self.net_values.shape[0]
         self.activated_values = 1/(1 + np.exp(-self.net_values))
-        # self.activated_values = np.reshape(np.append(self.activated_values.T, np.ones(batch_size)),
-        #                                   (self.node_amount + 1, batch_size)).T
         self.activated_values = np.vstack((self.activated_values.T, np.ones(batch_size))).T
 
     def calc_delta(self, labels: list):
@@ -154,9 +150,14 @@ class NetWork:
         self.weights[-1].weight.T[-1] = 0
         self.layers[-1].lead_weights.weight = self.layers[-1].lead_weights.weight * np.sqrt(2.0)
 
-    def training(self, train_data, labels):
+    def training(self, train_data, labels, train_layer_num=None):
         self.data = train_data
         self.labels = labels
+        if not train_layer_num:
+            index = len(self.weights)
+        else:
+            index = train_layer_num
+
         for item, key in zip(self.data, self.labels):
             # input_data_to_input_layer
             self.layers[0].net_values = np.array(item)
@@ -166,18 +167,18 @@ class NetWork:
                 layer.activate()
                 layer.calc_net_values()
             # back propagation
-            for layer in reversed(self.layers):
+            for layer in list(reversed(self.layers))[:index]:
                 layer.calc_delta(key)
             if self.optimizer == SGD:
-                for weight in self.weights:
+                for weight in self.weights[-index:]:
                     weight.calc_grad()
                     weight.sgd()
             if self.optimizer == MomentumSGD:
-                for weight in self.weights:
+                for weight in self.weights[-index:]:
                     weight.calc_grad()
                     weight.momentum_sgd()
             if self.optimizer == Adam:
-                for weight in self.weights:
+                for weight in self.weights[-index:]:
                     weight.calc_grad()
                     weight.adam()
 
@@ -197,7 +198,7 @@ class NetWork:
             if np.argmax(v) == label:
                 accuracy += 1.0/data_amount
             error_average += -math.log(v[label], math.e) / data_amount
-        return accuracy, error_average
+        return accuracy, error_average, self.l1_norm()/len(self.weights), self.l2_norm()/len(self.weights)
 
     def is_proved(self, err: list) -> bool:
         if not err:
@@ -221,7 +222,37 @@ class NetWork:
         if self.activation == ReLU:
             self.layers.extend([Layer(MD1), Layer(MD2), SoftMaxLayer(CLASS_NUM)])
         self.weights = []
-        for w in self.previous_weights[:-2]:
-            self.weights.append(w)
-            self.weights[-1].moment = 0.0
         self.__init_weight(len(self.weights))
+        for target, previous in zip(self.weights[:-3], self.previous_weights):
+            target.weight = previous.weight
+
+    def rollback_layer(self):
+        layers = []
+        if self.activation == SIGMOID:
+            layers.append(SigmoidLayer(self.hidden_layer))
+            for i in range(len(self.layers)-4):
+                layers.append(SigmoidLayer(MD1))
+            layers.append(SigmoidLayer(MD2))
+        if self.activation == ReLU:
+            layers.append(Layer(self.hidden_layer))
+            for i in range(len(self.layers)-4):
+                layers.append(Layer(MD1))
+            layers.append(Layer(MD2))
+        layers.append(SoftMaxLayer(CLASS_NUM))
+        self.layers = layers
+        self.weights = []
+        self.__init_weight()
+        for target, previous in zip(self.weights, self.previous_weights):
+            target.weight = previous.weight
+
+    def l1_norm(self) -> float:
+        norm = 0
+        for weight in self.weights:
+            norm += np.abs(weight.weight).sum()
+        return norm
+
+    def l2_norm(self) -> float:
+        norm = 0
+        for weight in self.weights:
+            norm += (weight.weight ** 2).sum()
+        return norm

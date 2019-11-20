@@ -19,17 +19,17 @@ def main():
     else:
         train_data, train_label, test_data, test_label = read_cifar10()
 
-    model = NetWork(hidden_layer=2, input_dim=DATASET[DataLength], activation=ReLU, optimizer=SGD)
+    model = NetWork(hidden_layer=2, input_dim=DATASET[DataLength], activation=SIGMOID, optimizer=Adam)
     time2 = time.time()
     print("format_complete time:{0}".format(time2 - time1))
-    all_accuracy = []
-    all_err = []
-
     c = 0
+    accuracy = []
+    err = []
+    l1_norm = []
+    l2_norm = []
+    start = 0
     while True:
-        accuracy = []
-        err = []
-        while not early_stopping(err):
+        while not early_stopping(err, start):
             time3 = time.time()
             print("epoc{0} train_start".format(c))
             data, label = shuffle_data(train_data[:SAMPLE_SIZE], train_label[:SAMPLE_SIZE])
@@ -41,31 +41,51 @@ def main():
             time5 = time.time()
             print("test_end, time:{0}".format(time5 - time4))
             print("error_average:{0}, accuracy:{1}%".format(test_info[1], int(test_info[0] * 100)))
+            print("l1_norm:{0}, l2_norm:{1}".format(test_info[2], test_info[3]))
             accuracy.append(test_info[0])
             err.append(test_info[1])
+            l1_norm.append(test_info[2])
+            l2_norm.append(test_info[3])
             c += 1
-        all_accuracy.append(accuracy)
-        all_err.append(err)
         if model.is_proved(err):
             model.add_layer()
             print("add_layer")
+            start = c
         else:
             break
+    # additional leaning
+    model.rollback_layer()
+    print("decision layer num, start additional learning")
+    for i in range(10):
+        data, label = shuffle_data(train_data[:SAMPLE_SIZE], train_label[:SAMPLE_SIZE])
+        data, label = transform_data(data, label)
+        model.training(data, label, 2)
+        test_info = model.test(test_data[:VALIDATION_DATA], test_label[:VALIDATION_DATA])
+        accuracy.append(test_info[0])
+        err.append(test_info[1])
+        l1_norm.append(test_info[2])
+        l2_norm.append(test_info[3])
+        c += 1
+
+    for i in range(10):
+        data, label = shuffle_data(train_data[:SAMPLE_SIZE], train_label[:SAMPLE_SIZE])
+        data, label = transform_data(data, label)
+        model.training(data, label, 1)
+        test_info = model.test(test_data[:VALIDATION_DATA], test_label[:VALIDATION_DATA])
+        accuracy.append(test_info[0])
+        err.append(test_info[1])
+        l1_norm.append(test_info[2])
+        l2_norm.append(test_info[3])
+        c += 1
+
+    test_info = model.test(test_data[:VALIDATION_DATA], test_label[:VALIDATION_DATA])
+    time5 = time.time()
     print("\ntotal_train_time:{0}".format(time5 - time2))
     print("total_epoc:{0}".format(c))
     print("latest accuracy:{0}%".format(int(test_info[0]*100)))
     print("latest error:{0}".format(test_info[1]))
-    accuracy = list(itertools.chain.from_iterable(all_accuracy))
-    err = list(itertools.chain.from_iterable(all_err))
 
-    plt.subplot(2, 1, 1)
-    plt.plot(list(range(0, c, 1)), accuracy)
-    plt.title("accuracy")
-    plt.ylim(0, 1)
-    plt.subplot(2, 1, 2)
-    plt.plot(list(range(0, c, 1)), err)
-    plt.title("error")
-    plt.show()
+    plot_fig(accuracy, err, l1_norm, l2_norm, c)
 
 
 def read_cifar10() -> tuple:
@@ -204,13 +224,30 @@ def view_cifar(data: np.array, label: int) -> None:
     img.show()
 
 
-def early_stopping(err: list) -> bool:
-    if not err:
+def early_stopping(err: list, start) -> bool:
+    if len(err) == start:
         return False
-    arg_min = np.argmin(np.array(err))
-    if (len(err) - arg_min) < EARLY_STOPPING_EPOC:
+    arg_min = np.argmin(np.array(err[start:]))
+    if (len(err[start:]) - arg_min) < EARLY_STOPPING_EPOC:
         return False
     return True
+
+
+def plot_fig(accuracy: list, err: list, l1_norm: list, l2_norm: list, c):
+    plt.subplot(2, 2, 1)
+    plt.plot(list(range(0, c, 1)), accuracy)
+    plt.title("accuracy")
+    plt.ylim(0, 1)
+    plt.subplot(2, 2, 2)
+    plt.plot(list(range(0, c, 1)), err)
+    plt.title("error")
+    plt.subplot(2, 2, 3)
+    plt.plot(list(range(0, c, 1)), l1_norm)
+    plt.title("l1_norm")
+    plt.subplot(2, 2, 4)
+    plt.plot(list(range(0, c, 1)), l2_norm)
+    plt.title("l2_norm")
+    plt.show()
 
 
 if __name__ == "__main__":
