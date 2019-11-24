@@ -2,6 +2,7 @@ import random
 from consts import *
 import numpy as np
 import math
+import copy
 # from main import view_data as vd
 import sys
 
@@ -18,7 +19,8 @@ class Weights:
         self.t = 1
 
     def calc_grad(self):
-        self.gradients = np.dot(self.lag_layer.delta.T, self.lead_layer.activated_values).T / BATCH_SIZE
+        self.gradients = np.dot(self.lag_layer.delta.T, self.lead_layer.activated_values).T \
+                         + (LAMBDA * np.sign(self.weight))  # sparse
 
     def sgd(self):
         self.weight = self.weight - (ETA * self.gradients)
@@ -60,7 +62,7 @@ class Layer:
 
     def activate(self):
         batch_size = self.net_values.shape[0]
-        self.activated_values = np.where(self.net_values < 0, 0, self.net_values/10)
+        self.activated_values = self.activated_values * (self.activated_values > 0)
         self.activated_values = np.vstack((self.activated_values.T, np.ones(batch_size))).T
 
     def calc_net_values(self):
@@ -69,12 +71,18 @@ class Layer:
     def calc_delta(self, labels: list):
         norm_diff = (1/(BATCH_SIZE * self.sd))*(BATCH_SIZE - (self.net_values ** 2) - 1)
         round_z = self.lag_weights.lag_layer.delta.dot(self.lag_weights.weight[:-1].T) * norm_diff
-        self.delta = round_z * np.where(self.net_values <= 0, 0, 1/10)
+        self.delta = round_z * (self.net_values * (self.net_values > 0))/self.net_values
 
 
 class SigmoidLayer(Layer):
     def normalize(self):
-        pass
+        sd = []
+        ave = []
+        for v in self.net_values.T:
+            sd.append(float(np.sqrt(np.var(v) + 0.0001)))  # avoid 0 divide
+            ave.append(float(np.average(v)))
+        self.sd = np.array(sd)
+        self.net_values = (self.net_values - np.array(ave)) / self.sd
 
     def activate(self):
         batch_size = self.net_values.shape[0]
@@ -82,8 +90,9 @@ class SigmoidLayer(Layer):
         self.activated_values = np.vstack((self.activated_values.T, np.ones(batch_size))).T
 
     def calc_delta(self, labels: list):
+        norm_diff = (1/(BATCH_SIZE * self.sd))*(BATCH_SIZE - (self.net_values ** 2) - 1)
         round_z = np.dot(self.lag_weights.lag_layer.delta, self.lag_weights.weight[:-1].T)
-        self.delta = round_z * (1 - self.activated_values.T[:-1].T) * self.activated_values.T[:-1].T
+        self.delta = round_z * (1 - self.activated_values.T[:-1].T) * self.activated_values.T[:-1].T * norm_diff
 
 
 class SoftMaxLayer(Layer):
@@ -105,7 +114,7 @@ class SoftMaxLayer(Layer):
 
     def calc_delta(self, labels: list) -> np.array:
         norm_diff = (1/(BATCH_SIZE * self.sd))*(BATCH_SIZE - pow(self.net_values, 2) - 1)
-        delta_arr = np.array(self.activated_values.tolist())  # avoid_update_activated_value
+        delta_arr = copy.deepcopy(self.activated_values)
         for i, delta in zip(labels, delta_arr):
             delta[i] = delta[i] - 1
         self.delta = np.array(delta_arr) * norm_diff
@@ -117,6 +126,7 @@ class SoftMaxLayer(Layer):
 class NetWork:
     def __init__(self, hidden_layer: int, input_dim: int, activation: int, optimizer: int):
         self.hidden_layer = hidden_layer
+        self.input_dim = input_dim
         self.activation = activation
         self.optimizer = optimizer
         self.layers = []
@@ -136,19 +146,19 @@ class NetWork:
         self.__init_weight()
         self.data = None
         self.labels = None
-        self.last_err = None
+        self.last_accuracy = None
         self.previous_weights = None
 
     def __init_weight(self, i: int = 0):
         for lead, lag in zip(self.layers[i:-1], self.layers[i + 1:]):
-            arr = np.random.randn(lead.node_amount + 1, lag.node_amount) / np.sqrt(lead.node_amount + 1)
+            arr = np.random.randn(lead.node_amount + 1, lag.node_amount) * (np.sqrt(2.0 / (lead.node_amount + 1)))
             arr.T[-1] = 0.1
             weight = Weights(arr, lead, lag)
             lead.lag_weights = weight
             lag.lead_weights = weight
             self.weights.append(weight)
         self.weights[-1].weight.T[-1] = 0
-        self.layers[-1].lead_weights.weight = self.layers[-1].lead_weights.weight * np.sqrt(2.0)
+        self.layers[-1].lead_weights.weight = self.layers[-1].lead_weights.weight / np.sqrt(2.0)
 
     def training(self, train_data, labels, train_layer_num=None):
         self.data = train_data
@@ -198,16 +208,17 @@ class NetWork:
             if np.argmax(v) == label:
                 accuracy += 1.0/data_amount
             error_average += -math.log(v[label], math.e) / data_amount
-        return accuracy, error_average, self.l1_norm()/len(self.weights), self.l2_norm()/len(self.weights)
+        return accuracy, error_average, self.l1_norm(), self.l2_norm(), self.total_node()
 
-    def is_proved(self, err: list) -> bool:
-        if not err:
+    def is_proved(self, accuracy: list) -> bool:
+        if not accuracy:
             return True
-        if not self.last_err:
-            self.last_err = err[-1]
+        value = max(accuracy[-EARLY_STOPPING_EPOC:])
+        if not self.last_accuracy:
+            self.last_accuracy = value
             return True
-        if (self.last_err - err[-1]) / self.last_err > 0.01:
-            self.last_err = err[-1]
+        if value - self.last_accuracy >= 0.01:
+            self.last_accuracy = value
             return True
         return False
 
@@ -229,12 +240,12 @@ class NetWork:
     def rollback_layer(self):
         layers = []
         if self.activation == SIGMOID:
-            layers.append(SigmoidLayer(self.hidden_layer))
+            layers.append(SigmoidLayer(self.input_dim))
             for i in range(len(self.layers)-4):
                 layers.append(SigmoidLayer(MD1))
             layers.append(SigmoidLayer(MD2))
         if self.activation == ReLU:
-            layers.append(Layer(self.hidden_layer))
+            layers.append(Layer(self.input_dim))
             for i in range(len(self.layers)-4):
                 layers.append(Layer(MD1))
             layers.append(Layer(MD2))
@@ -256,3 +267,9 @@ class NetWork:
         for weight in self.weights:
             norm += (weight.weight ** 2).sum()
         return norm
+
+    def total_node(self) -> int:
+        node_amount = 0
+        for layer in self.layers:
+            node_amount += layer.node_amount
+        return node_amount

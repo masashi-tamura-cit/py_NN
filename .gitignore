@@ -8,5 +8,8 @@ venv/*
 src/data/*
 src/*.csv
 
+# plot files
+*.png
+
 # pycharm setting
 .idea/*
