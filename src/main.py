@@ -25,12 +25,12 @@ def main(data_set):
     else:
         print("wrong dataset")
         sys.exit()
-    models.append(NetWork(hidden_layer=2, input_dim=data_set[DataLength], activation=ReLU, optimizer=Adam))
+    models.append(NetWork(hidden_layer=2, input_dim=data_set[DataLength], activation=ReLU, optimizer=ADAM))
     models.append(NetWork(hidden_layer=2, input_dim=data_set[DataLength], activation=ReLU, optimizer=SGD))
-    models.append(NetWork(hidden_layer=2, input_dim=data_set[DataLength], activation=ReLU, optimizer=MomentumSGD))
-    models.append(NetWork(hidden_layer=2, input_dim=data_set[DataLength], activation=SIGMOID, optimizer=Adam))
+    models.append(NetWork(hidden_layer=2, input_dim=data_set[DataLength], activation=ReLU, optimizer=MOMENTUM_SGD))
+    models.append(NetWork(hidden_layer=2, input_dim=data_set[DataLength], activation=SIGMOID, optimizer=ADAM))
     models.append(NetWork(hidden_layer=2, input_dim=data_set[DataLength], activation=SIGMOID, optimizer=SGD))
-    models.append(NetWork(hidden_layer=2, input_dim=data_set[DataLength], activation=SIGMOID, optimizer=MomentumSGD))
+    models.append(NetWork(hidden_layer=2, input_dim=data_set[DataLength], activation=SIGMOID, optimizer=MOMENTUM_SGD))
     time2 = time.time()
     print("format_complete time:{0}".format(time2 - time1))
     for model in models:
@@ -46,7 +46,7 @@ def main(data_set):
         while is_proved:
             while not early_stopping(err, start):
                 time3 = time.time()
-                print("epoc{0} train_start".format(c))
+                print("epoch{0} train_start".format(c))
                 data, label = shuffle_data(train_data[:SAMPLE_SIZE], train_label[:SAMPLE_SIZE])
                 data, label = transform_data(data, label)
                 model.training(data, label)
@@ -64,7 +64,7 @@ def main(data_set):
                 node_amount.append(test_info[4])
                 c += 1
                 # plot_fig(accuracy, err, l1_norm, l2_norm, node_amount, c, model)
-            print("early_stopping, epocs: {0}".format(c-start))
+            print("early_stopping, epochs: {0}".format(c-start))
             if model.is_proved(accuracy):
                 model.add_layer()
                 print("add_layer")
@@ -100,13 +100,13 @@ def main(data_set):
         test_info = model.test(test_data[:VALIDATION_DATA], test_label[:VALIDATION_DATA])
         time5 = time.time()
         print("\ntotal_train_time:{0}".format(time5 - time2))
-        print("total_epoc:{0}".format(c))
+        print("total_epoch:{0}".format(c))
         print("latest accuracy:{0}%".format(int(test_info[0]*100)))
         print("latest error:{0}".format(test_info[1]))
 
         title = plot_fig(accuracy, err, l1_norm, l2_norm, node_amount, c, model)
         make_csv(title, exec_time, accuracy, err, l1_norm, l2_norm, node_amount)
-    print("total {0}min".format(time5 - time1))
+    print("total {0}min".format(int((time5 - time1)/60)))
 
 
 def read_cifar10() -> tuple:
@@ -249,7 +249,7 @@ def early_stopping(err: list, start) -> bool:
     if len(err) == start:
         return False
     arg_min = np.argmin(np.array(err[start:]))
-    if (len(err[start:]) - arg_min) < EARLY_STOPPING_EPOC:
+    if (len(err[start:]) - arg_min) < EARLY_STOPPING_EPOCH:
         return False
     return True
 
@@ -258,12 +258,13 @@ def plot_fig(accuracy: list, err: list, l1_norm: list, l2_norm: list, total_amou
 
     name = "MNIST" if model.input_dim == 784 else "CIFAR10"
     activation = "Sigmoid" if model.activation == SIGMOID else "ReLU"
-    if model.optimizer == Adam:
+
+    if isinstance(model.optimizer, Adam):
         optimizer = "Adam"
-    elif model.optimizer == SGD:
-        optimizer = "SGD"
-    else:
+    elif isinstance(model.optimizer, MomentumSgd):
         optimizer = "MomentumSGD"
+    else:
+        optimizer = "SGD"
     title = "{0}, {1}-{2}, {3}, {4}".format(name, MD1, MD2, optimizer, activation)  # e.g. MNIST, 50-100, Adam, Sigmoid
     fig = plt.figure()
     fig.suptitle(title)

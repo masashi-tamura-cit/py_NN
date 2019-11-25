@@ -3,40 +3,64 @@ from consts import *
 import numpy as np
 import math
 import copy
-# from main import view_data as vd
 import sys
 
 
+class Sgd:
+    def optimize(self, weight, grad):
+        return weight - (ETA * grad)
+
+    def reset(self):
+        pass
+
+
+class MomentumSgd(Sgd):
+    def __init__(self):
+        self.__moment = 0
+
+    def optimize(self, weight, grad):
+        delta = (ETA * grad) + self.__moment
+        self.__moment = delta * BETA1
+        return weight - delta
+
+    def reset(self):
+        self.__moment = 0
+
+
+class Adam(Sgd):
+    def __init__(self):
+        self.__mt = 0
+        self.__vt = 0
+        self.__t = 1
+
+    def optimize(self, weight, grad):
+        self.__mt = BETA1 * self.__mt + ((1 - BETA1) * grad)
+        self.__vt = BETA2 * self.__vt + ((1 - BETA2) * np.power(grad, 2))
+        m = self.__mt/(1 - pow(BETA1, self.__t))
+        v = self.__vt/(1 - pow(BETA2, self.__t))
+        self.__t += 1
+        return weight - ALPHA * (m / (np.sqrt(v) + EPS))
+
+    def reset(self):
+        self.__mt = 0
+        self.__vt = 0
+        self.__t = 1
+
+
 class Weights:
-    def __init__(self, weight: np.array, lead_layer, lag_layer):
+    def __init__(self, weight: np.array, lead_layer, lag_layer, optimizer):
         self.weight = weight  # 重み
         self.lag_layer = lag_layer  # Layer class object
         self.lead_layer = lead_layer  # Layer class object
         self.gradients = np.array([])
-        self.moment = 0
-        self.mt = 0
-        self.vt = 0
-        self.t = 1
+        self.optimizer = optimizer
 
     def calc_grad(self):
         self.gradients = np.dot(self.lag_layer.delta.T, self.lead_layer.activated_values).T \
                          + (LAMBDA * np.sign(self.weight))  # sparse
 
-    def sgd(self):
-        self.weight = self.weight - (ETA * self.gradients)
-
-    def momentum_sgd(self):
-        delta = (ETA * self.gradients) + self.moment
-        self.weight = self.weight - delta
-        self.moment = delta * BETA1
-
-    def adam(self):
-        self.mt = BETA1 * self.mt + ((1 - BETA1) * self.gradients)
-        self.vt = BETA2 * self.vt + ((1 - BETA2) * np.power(self.gradients, 2))
-        m = self.mt/(1 - pow(BETA1, self.t))
-        v = self.vt/(1 - pow(BETA2, self.t))
-        self.weight = self.weight - ALPHA * (m / (np.sqrt(v) + EPS))
-        self.t += 1
+    def optimize(self):
+        self.weight = self.optimizer.optimize(self.weight, self.gradients)
 
 
 class Layer:
@@ -62,7 +86,7 @@ class Layer:
 
     def activate(self):
         batch_size = self.net_values.shape[0]
-        self.activated_values = self.activated_values * (self.activated_values > 0)
+        self.activated_values = self.net_values * (self.net_values > 0)
         self.activated_values = np.vstack((self.activated_values.T, np.ones(batch_size))).T
 
     def calc_net_values(self):
@@ -128,20 +152,35 @@ class NetWork:
         self.hidden_layer = hidden_layer
         self.input_dim = input_dim
         self.activation = activation
-        self.optimizer = optimizer
         self.layers = []
-        if self.activation == SIGMOID:
+
+        # set layers
+        if activation == SIGMOID:
             self.layers.append(SigmoidLayer(input_dim))
             for i in range(hidden_layer - 1):
                 self.layers.append(SigmoidLayer(MD1))
             self.layers.append(SigmoidLayer(MD2))
-        if self.activation == ReLU:
+        elif activation == ReLU:
             self.layers.append(Layer(input_dim))
             for i in range(hidden_layer - 1):
                 self.layers.append(Layer(MD1))
             self.layers.append(Layer(MD2))
-
+        else:
+            print("bad input: activation_func")
+            sys.exit()
         self.layers.append(SoftMaxLayer(CLASS_NUM))
+
+        # set optimizer
+        if optimizer == ADAM:
+            self.optimizer = Adam()
+        elif optimizer == MOMENTUM_SGD:
+            self.optimizer = MomentumSgd()
+        elif optimizer == SGD:
+            self.optimizer = Sgd()
+        else:
+            print("bad input: optimizer")
+            sys.exit()
+
         self.weights = []
         self.__init_weight()
         self.data = None
@@ -153,7 +192,7 @@ class NetWork:
         for lead, lag in zip(self.layers[i:-1], self.layers[i + 1:]):
             arr = np.random.randn(lead.node_amount + 1, lag.node_amount) * (np.sqrt(2.0 / (lead.node_amount + 1)))
             arr.T[-1] = 0.1
-            weight = Weights(arr, lead, lag)
+            weight = Weights(arr, lead, lag, copy.deepcopy(self.optimizer))
             lead.lag_weights = weight
             lag.lead_weights = weight
             self.weights.append(weight)
@@ -179,18 +218,9 @@ class NetWork:
             # back propagation
             for layer in list(reversed(self.layers))[:index]:
                 layer.calc_delta(key)
-            if self.optimizer == SGD:
-                for weight in self.weights[-index:]:
-                    weight.calc_grad()
-                    weight.sgd()
-            if self.optimizer == MomentumSGD:
-                for weight in self.weights[-index:]:
-                    weight.calc_grad()
-                    weight.momentum_sgd()
-            if self.optimizer == Adam:
-                for weight in self.weights[-index:]:
-                    weight.calc_grad()
-                    weight.adam()
+            for weight in self.weights[-index:]:
+                weight.calc_grad()
+                weight.optimize()
 
     def test(self, test_data: np.array, test_labels: list) -> tuple:
         accuracy = 0.0
@@ -213,7 +243,7 @@ class NetWork:
     def is_proved(self, accuracy: list) -> bool:
         if not accuracy:
             return True
-        value = max(accuracy[-EARLY_STOPPING_EPOC:])
+        value = max(accuracy[-EARLY_STOPPING_EPOCH:])
         if not self.last_accuracy:
             self.last_accuracy = value
             return True
@@ -236,6 +266,8 @@ class NetWork:
         self.__init_weight(len(self.weights))
         for target, previous in zip(self.weights[:-3], self.previous_weights):
             target.weight = previous.weight
+        for w in self.weights:
+            w.optimizer.reset()
 
     def rollback_layer(self):
         layers = []

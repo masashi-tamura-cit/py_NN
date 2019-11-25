@@ -33,21 +33,21 @@ CIFAR100 = {DataSet: "CIFAR100", FileName: ["train.bin", "test.bin"]}
 ReLU = 0
 SIGMOID = 1
 SGD = 0
-MomentumSGD = 1
-Adam = 2
+MOMENTUM_SGD = 1
+ADAM = 2
 
 # settings
 DATASET = MNIST
 BATCH_SIZE = 32
-MD1 = 500
+MD1 = 50
 MD2 = 2 * MD1
 SAMPLE_SIZE = 6400
 VALIDATION_DATA = 100
-EARLY_STOPPING_EPOC = 30
+EARLY_STOPPING_EPOCH = 30
 # optimizer params
 ETA = 0.01
 ALPHA = 0.001
 BETA1 = 0.9
 BETA2 = 0.999
 EPS = pow(10, -8)
-LAMBDA = 0.1
+LAMBDA = 0.05
