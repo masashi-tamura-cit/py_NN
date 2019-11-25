@@ -1,4 +1,3 @@
-import random
 from consts import *
 import numpy as np
 import math
@@ -54,10 +53,12 @@ class Weights:
         self.lead_layer = lead_layer  # Layer class object
         self.gradients = np.array([])
         self.optimizer = optimizer
+        self.is_fixed = False
 
     def calc_grad(self):
-        self.gradients = np.dot(self.lag_layer.delta.T, self.lead_layer.activated_values).T \
-                         + (LAMBDA * np.sign(self.weight))  # sparse
+        lm = LAMBDA if not self.is_fixed else 0
+        self.gradients = np.dot(self.lag_layer.delta.T,
+                                self.lead_layer.activated_values).T + (lm * np.sign(self.weight))
 
     def optimize(self):
         self.weight = self.optimizer.optimize(self.weight, self.gradients)
@@ -79,7 +80,7 @@ class Layer:
         sd = []
         ave = []
         for v in self.net_values.T:
-            sd.append(float(np.sqrt(np.var(v) + 0.0001)))  # avoid 0 divide
+            sd.append(float(np.sqrt(np.var(v) + EPS)))  # avoid 0 divide
             ave.append(float(np.average(v)))
         self.sd = np.array(sd)
         self.net_values = (self.net_values - np.array(ave)) / self.sd
@@ -266,6 +267,7 @@ class NetWork:
         self.__init_weight(len(self.weights))
         for target, previous in zip(self.weights[:-3], self.previous_weights):
             target.weight = previous.weight
+            target.is_fixed = True
         for w in self.weights:
             w.optimizer.reset()
 

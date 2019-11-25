@@ -5,7 +5,6 @@ import time
 from classes import *
 import numpy as np
 from matplotlib import pyplot as plt
-import itertools
 from PIL import Image
 import math
 import random
@@ -282,7 +281,7 @@ def plot_fig(accuracy: list, err: list, l1_norm: list, l2_norm: list, total_amou
     # performance_fig.set_title("performance")
 
     status_fig.plot(x, l1_norm, color="g", label="L1_norm")
-    status_fig.plot(x, l2_norm, color="b", label="L2_norm")
+    # status_fig.plot(x, l2_norm, color="b", label="L2_norm")
     node_amount = status_fig.twinx()
     node_amount.plot(x, total_amount, color="r", linestyle="dotted", label="node_amount")
     handle1, label1 = status_fig.get_legend_handles_labels()
