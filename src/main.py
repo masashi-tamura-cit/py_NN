@@ -67,6 +67,8 @@ def main(data_set):
                 l2_norm.append(test_info[3])
                 node_amount.append(test_info[4])
                 c += 1
+                if not c % 5:
+                    model.propose_method()
                 # plot_fig(accuracy, err, l1_norm, l2_norm, node_amount, c, model)
             # print("early_stopping, epochs: {0}".format(c-start))
             if model.is_proved(accuracy):

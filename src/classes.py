@@ -324,3 +324,10 @@ class NetWork:
             if np.argmax(value) == key:
                 acc += 1
         return acc
+
+    def propose_method(self) -> None:
+        """
+        ノードと重みのスパース推定を行う
+        :return:
+        """
+        pass
