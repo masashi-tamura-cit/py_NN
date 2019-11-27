@@ -55,6 +55,7 @@ class Weights:
         self.gradients = np.array([])
         self.optimizer = optimizer
         self.is_fixed = False
+        self.active_set = 1
 
     def calc_grad(self):
         if self.is_fixed:
@@ -68,6 +69,15 @@ class Weights:
             return None
         self.weight = self.optimizer.optimize(self.weight, self.gradients)
 
+    def make_active_set(self, ratio):
+        """
+        重みのactive_set行列（２次元）を作る
+        重みの絶対値が０に近いものから順に非activeにする
+        :param ratio: あらたに非activeにする重みの数の全体のactiveな重み本数に対する割合
+        :return: None
+        """
+        pass
+
 
 class Layer:
     def __init__(self, amount: int):
@@ -80,6 +90,10 @@ class Layer:
         self.delta = np.array([])
         self.test_nodes = np.array([])
         self.sd = []
+        self.active_set = 1
+
+    def deactivate(self):
+        self.net_values = self.net_values * self.active_set
 
     def normalize(self):
         self.sd = np.sqrt(np.var(self.net_values, axis=0))
@@ -92,12 +106,31 @@ class Layer:
         self.activated_values = np.vstack((self.activated_values.T, np.ones(batch_size))).T
 
     def calc_net_values(self):
-        self.lag_weights.lag_layer.net_values = np.dot(self.activated_values, self.lag_weights.weight)
+        self.lag_weights.lag_layer.net_values \
+            = np.dot(self.activated_values, (self.lag_weights.weight * self.lag_weights.active_set))
 
     def calc_delta(self, labels: list):
         norm_diff = (1/(BATCH_SIZE * self.sd))*(BATCH_SIZE - (self.net_values ** 2) - 1)
         round_z = self.lag_weights.lag_layer.delta.dot(self.lag_weights.weight[:-1].T) * norm_diff
         self.delta = round_z * (self.net_values * (self.net_values > 0))/self.net_values
+
+    def make_active_set(self, ratio):
+        """
+        active set を作る
+        ０，１の１次元配列で０が非active, 1がactiveとなる
+        そのノードに繋がる重みのL1ノルムが小さい順に非activeにする
+        :param ratio: 非active化する割合
+        :return: None
+        """
+        pass
+
+    def delete_node(self):
+        """
+        非activeなノードを削除する
+        削除したノードに繋がる重みも列（行）を一括で削除する
+        :return: None
+        """
+        pass
 
 
 class SigmoidLayer(Layer):
@@ -187,6 +220,7 @@ class NetWork:
         self.__init_weight()
         self.last_accuracy = None
         self.previous_weights = None
+        self.deactivate_ratio = 0.1
 
     def __init_weight(self, i: int = 0):
         for lead, lag in zip(self.layers[i:-1], self.layers[i + 1:]):
@@ -325,9 +359,21 @@ class NetWork:
                 acc += 1
         return acc
 
-    def propose_method(self) -> None:
+    def propose_method(self, prev_error, now_error) -> None:
         """
         ノードと重みのスパース推定を行う
         :return:
         """
-        pass
+        # check is_not_decline
+        if not prev_error - now_error < 0.05:
+            # rollback
+            # decline_ratio
+            return None
+        print("sparse")
+        for l in self.layers[-3:]:
+            if l.lead_weights:
+                if l.active_set:
+                    l.delete_node()
+                l.make_active_set(self.deactivate_ratio)
+        for w in self.weights:
+            w.make_active_set(self.deactivate_ratio)

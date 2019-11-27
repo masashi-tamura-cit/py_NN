@@ -25,11 +25,11 @@ def main(data_set):
         print("wrong dataset")
         sys.exit()
     models.append(NetWork(hidden_layer=2, input_dim=data_set[DataLength], activation=ReLU, optimizer=ADAM))
-    models.append(NetWork(hidden_layer=2, input_dim=data_set[DataLength], activation=ReLU, optimizer=SGD))
-    models.append(NetWork(hidden_layer=2, input_dim=data_set[DataLength], activation=ReLU, optimizer=MOMENTUM_SGD))
-    models.append(NetWork(hidden_layer=2, input_dim=data_set[DataLength], activation=SIGMOID, optimizer=ADAM))
-    models.append(NetWork(hidden_layer=2, input_dim=data_set[DataLength], activation=SIGMOID, optimizer=SGD))
-    models.append(NetWork(hidden_layer=2, input_dim=data_set[DataLength], activation=SIGMOID, optimizer=MOMENTUM_SGD))
+    # models.append(NetWork(hidden_layer=2, input_dim=data_set[DataLength], activation=ReLU, optimizer=SGD))
+    # models.append(NetWork(hidden_layer=2, input_dim=data_set[DataLength], activation=ReLU, optimizer=MOMENTUM_SGD))
+    # models.append(NetWork(hidden_layer=2, input_dim=data_set[DataLength], activation=SIGMOID, optimizer=ADAM))
+    # models.append(NetWork(hidden_layer=2, input_dim=data_set[DataLength], activation=SIGMOID, optimizer=SGD))
+    # models.append(NetWork(hidden_layer=2, input_dim=data_set[DataLength], activation=SIGMOID, optimizer=MOMENTUM_SGD))
     time2 = time.time()
     # print("format_complete time:{0}".format(time2 - time1))
     for model in models:
@@ -55,20 +55,20 @@ def main(data_set):
                 train_accuracy.append(train_info[0])
                 train_error.append(train_info[1])
                 time4 = time.time()
-                # print("train_end, time:{}".format(time4 - time3))
+                print("train_end, time:{}".format(time4 - time3))
                 test_info = model.test(test_data[:VALIDATION_DATA], test_label[:VALIDATION_DATA])
                 time5 = time.time()
-                # print("test_end, time:{0}".format(time5 - time4))
-                # print("error_average:{0}, accuracy:{1}%".format(test_info[1], int(test_info[0] * 100)))
-                # print("l1_norm:{0}, l2_norm:{1}, node_amount{2}".format(test_info[2], test_info[3], test_info[4]))
+                print("test_end, time:{0}".format(time5 - time4))
+                print("error_average:{0}, accuracy:{1}%".format(test_info[1], int(test_info[0] * 100)))
+                print("l1_norm:{0}, l2_norm:{1}, node_amount{2}".format(test_info[2], test_info[3], test_info[4]))
                 accuracy.append(test_info[0])
                 err.append(test_info[1])
                 l1_norm.append(test_info[2])
                 l2_norm.append(test_info[3])
                 node_amount.append(test_info[4])
                 c += 1
-                if not c % 5:
-                    model.propose_method()
+                if not (c - start) % 5:
+                    model.propose_method(err[-5], err[-1])
                 # plot_fig(accuracy, err, l1_norm, l2_norm, node_amount, c, model)
             # print("early_stopping, epochs: {0}".format(c-start))
             if model.is_proved(accuracy):
@@ -324,7 +324,7 @@ def make_csv(title, exec_time, train_accuracy, train_error, accuracy, error, l1_
 
 
 if __name__ == "__main__":
-    print("IMPORTANT!")
-    for _ in range(10):
+    # print("IMPORTANT!")
+    for _ in range(1):
         main(MNIST)
-        main(CIFAR10)
+        # main(CIFAR10)
