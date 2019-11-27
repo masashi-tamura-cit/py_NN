@@ -3,6 +3,7 @@ import numpy as np
 import math
 import copy
 import sys
+import time
 
 
 class Sgd:
@@ -56,11 +57,15 @@ class Weights:
         self.is_fixed = False
 
     def calc_grad(self):
-        lm = LAMBDA if not self.is_fixed else 0
-        self.gradients = np.dot(self.lag_layer.delta.T,
-                                self.lead_layer.activated_values).T + (lm * np.sign(self.weight))
+        if self.is_fixed:
+            return None
+
+        self.gradients = (np.dot(self.lag_layer.delta.T, self.lead_layer.activated_values).T +
+                          (LAMBDA * np.sign(self.weight))) / BATCH_SIZE
 
     def optimize(self):
+        if self.is_fixed:
+            return None
         self.weight = self.optimizer.optimize(self.weight, self.gradients)
 
 
@@ -77,13 +82,9 @@ class Layer:
         self.sd = []
 
     def normalize(self):
-        sd = []
-        ave = []
-        for v in self.net_values.T:
-            sd.append(float(np.sqrt(np.var(v) + EPS)))  # avoid 0 divide
-            ave.append(float(np.average(v)))
-        self.sd = np.array(sd)
-        self.net_values = (self.net_values - np.array(ave)) / self.sd
+        self.sd = np.sqrt(np.var(self.net_values, axis=0))
+        ave = np.average(self.net_values, axis=0)
+        self.net_values = (self.net_values - ave) / (self.sd + EPS)
 
     def activate(self):
         batch_size = self.net_values.shape[0]
@@ -184,8 +185,6 @@ class NetWork:
 
         self.weights = []
         self.__init_weight()
-        self.data = None
-        self.labels = None
         self.last_accuracy = None
         self.previous_weights = None
 
@@ -200,15 +199,14 @@ class NetWork:
         self.weights[-1].weight.T[-1] = 0
         self.layers[-1].lead_weights.weight = self.layers[-1].lead_weights.weight / np.sqrt(2.0)
 
-    def training(self, train_data, labels, train_layer_num=None):
-        self.data = train_data
-        self.labels = labels
+    def training(self, train_data, labels, train_layer_num=None) -> tuple:
+        error = 0
+        accuracy = 0
         if not train_layer_num:
-            index = len(self.weights)
+            index = 3
         else:
             index = train_layer_num
-
-        for item, key in zip(self.data, self.labels):
+        for item, key in zip(train_data, labels):
             # input_data_to_input_layer
             self.layers[0].net_values = np.array(item)
             # forward operation
@@ -216,29 +214,25 @@ class NetWork:
                 layer.normalize()
                 layer.activate()
                 layer.calc_net_values()
+            error += self.calc_error_sum(key)
+            accuracy += self.calc_correct_num(key)
             # back propagation
             for layer in list(reversed(self.layers))[:index]:
                 layer.calc_delta(key)
             for weight in self.weights[-index:]:
                 weight.calc_grad()
                 weight.optimize()
+        return accuracy/SAMPLE_SIZE, error/SAMPLE_SIZE
 
     def test(self, test_data: np.array, test_labels: list) -> tuple:
-        accuracy = 0.0
-        error_average = 0.0
-        self.data = test_data
         self.layers[0].net_values = test_data
-        self.labels = test_labels
-
         data_amount = len(test_labels)
         for layer in self.layers:
             layer.normalize()
             layer.activate()
             layer.calc_net_values()
-        for v, label in zip(self.layers[-1].activated_values, self.labels):
-            if np.argmax(v) == label:
-                accuracy += 1.0/data_amount
-            error_average += -math.log(v[label], math.e) / data_amount
+        accuracy = self.calc_correct_num(test_labels) / data_amount
+        error_average = self.calc_error_sum(test_labels) / data_amount
         return accuracy, error_average, self.l1_norm(), self.l2_norm(), self.total_node()
 
     def is_proved(self, accuracy: list) -> bool:
@@ -307,3 +301,26 @@ class NetWork:
         for layer in self.layers:
             node_amount += layer.node_amount
         return node_amount
+
+    def calc_error_sum(self, label: list) -> float:
+        """
+        1バッチの誤差関数値合計を返す関数
+        :param label: 入力データのラベル
+        :return: 誤差関数値合計
+        """
+        error = 0
+        for value, key in zip(self.layers[-1].activated_values, label):
+            error += -math.log(value[key], np.e)
+        return error
+
+    def calc_correct_num(self, label: list) -> int:
+        """
+        １バッチの正解数を返す関数
+        :param label: 入力データのラベル
+        :return: 正解数
+        """
+        acc = 0
+        for value, key in zip(self.layers[-1].activated_values, label):
+            if np.argmax(value) == key:
+                acc += 1
+        return acc

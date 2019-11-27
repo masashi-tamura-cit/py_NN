@@ -31,10 +31,12 @@ def main(data_set):
     models.append(NetWork(hidden_layer=2, input_dim=data_set[DataLength], activation=SIGMOID, optimizer=SGD))
     models.append(NetWork(hidden_layer=2, input_dim=data_set[DataLength], activation=SIGMOID, optimizer=MOMENTUM_SGD))
     time2 = time.time()
-    print("format_complete time:{0}".format(time2 - time1))
+    # print("format_complete time:{0}".format(time2 - time1))
     for model in models:
         time2 = time.time()
         c = 0
+        train_accuracy = []
+        train_error = []
         accuracy = []
         err = []
         l1_norm = []
@@ -45,17 +47,20 @@ def main(data_set):
         while is_proved:
             while not early_stopping(err, start):
                 time3 = time.time()
-                print("epoch{0} train_start".format(c))
+                # print("epoch{0} train_start".format(c))
                 data, label = shuffle_data(train_data[:SAMPLE_SIZE], train_label[:SAMPLE_SIZE])
+                # data, label = shuffle_data(train_data, train_label)
                 data, label = transform_data(data, label)
-                model.training(data, label)
+                train_info = model.training(data, label)
+                train_accuracy.append(train_info[0])
+                train_error.append(train_info[1])
                 time4 = time.time()
-                print("train_end, time:{}".format(time4 - time3))
+                # print("train_end, time:{}".format(time4 - time3))
                 test_info = model.test(test_data[:VALIDATION_DATA], test_label[:VALIDATION_DATA])
                 time5 = time.time()
-                print("test_end, time:{0}".format(time5 - time4))
-                print("error_average:{0}, accuracy:{1}%".format(test_info[1], int(test_info[0] * 100)))
-                print("l1_norm:{0}, l2_norm:{1}, node_amount{2}".format(test_info[2], test_info[3], test_info[4]))
+                # print("test_end, time:{0}".format(time5 - time4))
+                # print("error_average:{0}, accuracy:{1}%".format(test_info[1], int(test_info[0] * 100)))
+                # print("l1_norm:{0}, l2_norm:{1}, node_amount{2}".format(test_info[2], test_info[3], test_info[4]))
                 accuracy.append(test_info[0])
                 err.append(test_info[1])
                 l1_norm.append(test_info[2])
@@ -63,16 +68,16 @@ def main(data_set):
                 node_amount.append(test_info[4])
                 c += 1
                 # plot_fig(accuracy, err, l1_norm, l2_norm, node_amount, c, model)
-            print("early_stopping, epochs: {0}".format(c-start))
+            # print("early_stopping, epochs: {0}".format(c-start))
             if model.is_proved(accuracy):
                 model.add_layer()
-                print("add_layer")
+                # print("add_layer")
                 start = c
             else:
                 is_proved = False
         # additional leaning
         model.rollback_layer()
-        print("decision layer num, start additional learning")
+        # print("decision layer num, start additional learning")
         for i in range(10):
             data, label = shuffle_data(train_data[:SAMPLE_SIZE], train_label[:SAMPLE_SIZE])
             data, label = transform_data(data, label)
@@ -98,13 +103,13 @@ def main(data_set):
 
         test_info = model.test(test_data[:VALIDATION_DATA], test_label[:VALIDATION_DATA])
         time5 = time.time()
-        print("\ntotal_train_time:{0}".format(time5 - time2))
-        print("total_epoch:{0}".format(c))
+        # print("\ntotal_train_time:{0}".format(time5 - time2))
+        # print("total_epoch:{0}".format(c))
         print("latest accuracy:{0}%".format(int(test_info[0]*100)))
-        print("latest error:{0}".format(test_info[1]))
+        # print("latest error:{0}".format(test_info[1]))
 
         title = plot_fig(accuracy, err, l1_norm, l2_norm, node_amount, c, model)
-        make_csv(title, exec_time, accuracy, err, l1_norm, l2_norm, node_amount)
+        make_csv(title, exec_time, train_accuracy, train_error, accuracy, err, l1_norm, node_amount)
     print("total {0}min".format(int((time5 - time1)/60)))
 
 
@@ -293,28 +298,31 @@ def plot_fig(accuracy: list, err: list, l1_norm: list, l2_norm: list, total_amou
     return title
 
 
-def make_csv(title, exec_time, accuracy, error, l1_norm, l2_norm, node_amount):
+def make_csv(title, exec_time, train_accuracy, train_error, accuracy, error, l1_norm, node_amount):
     """
     学習時の情報をCSV化するメソッド e.g. "MNIST_500-1000_Adam_Sigmoid_11251759.csv"
     :param title: ファイル名 str
     :param exec_time: スクリプト実行時刻 datetime
+    :param train_accuracy: 訓練時の正答率
+    :param train_error: 訓練時の誤差関数地
     :param accuracy: 精度 list
     :param error: 誤差関数値 list
     :param l1_norm: 重みの絶対値和 list
-    :param l2_norm: 重みの2乗和 list
     :param node_amount: ノード数 list
     :return: None
     """
-    columns = ["accuracy", "error", "L1_norm", "L2_norm", "node_amount"]
+    columns = ["train_accuracy", "train_error", "accuracy", "error", "L1_norm", "node_amount"]
     file_title = "{0}_{1:%m%d%H%M}.csv".format(title, exec_time).replace(", ", "_")
     file_path = os.path.join(DATA_DIR, file_title)
     with open(file_path, 'w', newline="") as f:
         writer = csv.writer(f)
         writer.writerow(columns)
-        for data in zip(accuracy, error, l1_norm, l2_norm, node_amount):
+        for data in zip(train_accuracy, train_error, accuracy, error, l1_norm, node_amount):
             writer.writerow(data)
 
 
 if __name__ == "__main__":
-    main(MNIST)
-    main(CIFAR10)
+    print("IMPORTANT!")
+    for _ in range(10):
+        main(MNIST)
+        main(CIFAR10)

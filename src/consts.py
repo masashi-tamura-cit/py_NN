@@ -9,8 +9,8 @@ Label = 2
 DataLength = 3
 DataAmount = 4
 TestAmount = 5
-# DATA_DIR = os.path.join(os.getcwd(), "data")
-DATA_DIR = 'C:\\Users\\tamtam\\PycharmProjects\\untitled\\src\\data'
+DATA_DIR = os.path.join(os.getcwd(), "data")
+# DATA_DIR = 'C:\\Users\\tamtam\\PycharmProjects\\untitled\\src\\data'
 
 MNIST = {
     DataSet: "MNIST",
@@ -39,15 +39,15 @@ ADAM = 2
 # settings
 DATASET = MNIST
 BATCH_SIZE = 32
-MD1 = 500
+MD1 = 50
 MD2 = 2 * MD1
 SAMPLE_SIZE = 6400
 VALIDATION_DATA = 100
 EARLY_STOPPING_EPOCH = 30
 # optimizer params
-ETA = 0.01
+ETA = 0.002
 ALPHA = 0.001
 BETA1 = 0.9
 BETA2 = 0.999
 EPS = pow(10, -8)
-LAMBDA = 0.03
+LAMBDA = 0.001
