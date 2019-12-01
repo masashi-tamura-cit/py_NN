@@ -24,8 +24,8 @@ def main(data_set):
     else:
         print("wrong dataset")
         sys.exit()
-    models.append(NetWork(hidden_layer=2, input_dim=data_set[DataLength], activation=ReLU, optimizer=ADAM))
-    # models.append(NetWork(hidden_layer=2, input_dim=data_set[DataLength], activation=ReLU, optimizer=SGD))
+    # models.append(NetWork(hidden_layer=2, input_dim=data_set[DataLength], activation=ReLU, optimizer=ADAM))
+    models.append(NetWork(2, data_set[DataLength], ReLU, SGD, 500, 1000, CLASS_NUM))
     # models.append(NetWork(hidden_layer=2, input_dim=data_set[DataLength], activation=ReLU, optimizer=MOMENTUM_SGD))
     # models.append(NetWork(hidden_layer=2, input_dim=data_set[DataLength], activation=SIGMOID, optimizer=ADAM))
     # models.append(NetWork(hidden_layer=2, input_dim=data_set[DataLength], activation=SIGMOID, optimizer=SGD))
@@ -262,7 +262,7 @@ def early_stopping(err: list, start) -> bool:
 
 def plot_fig(accuracy: list, err: list, l1_norm: list, l2_norm: list, total_amount: list, c: int, model: NetWork):
 
-    name = "MNIST" if model.input_dim == 784 else "CIFAR10"
+    name = "MNIST" if model.layer_dims[0] == 784 else "CIFAR10"
     activation = "Sigmoid" if model.activation == SIGMOID else "ReLU"
 
     if isinstance(model.optimizer, Adam):
@@ -271,7 +271,7 @@ def plot_fig(accuracy: list, err: list, l1_norm: list, l2_norm: list, total_amou
         optimizer = "MomentumSGD"
     else:
         optimizer = "SGD"
-    title = "{0}, {1}-{2}, {3}, {4}".format(name, MD1, MD2, optimizer, activation)  # e.g. MNIST, 50-100, Adam, Sigmoid
+    title = "{0}, {1}, {2}".format(name, optimizer, activation)  # e.g. MNIST, 50-100, Adam, Sigmoid
     fig = plt.figure()
     fig.suptitle(title)
     performance_fig = fig.add_subplot(2, 1, 1)

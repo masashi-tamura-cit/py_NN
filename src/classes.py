@@ -55,7 +55,7 @@ class Weights:
         self.gradients = np.array([])
         self.optimizer = optimizer
         self.is_fixed = False
-        self.active_set = 1
+        self.active_set = np.ones(weight.shape)
 
     def calc_grad(self):
         if self.is_fixed:
@@ -76,10 +76,13 @@ class Weights:
         :param ratio: あらたに非activeにする重みの数の全体のactiveな重み本数に対する割合
         :return: None
         """
-        pass
+        arr = np.abs(self.weight)
+        sd = np.sqrt(np.var(arr) * self.weight.size /np.sum(self.active_set))
+        ave = np.average(arr)
+        self.active_set = np.where(arr > (ave - sd), 1, 0)
 
 
-class Layer:
+class Layer: 
     def __init__(self, amount: int):
         self.node_amount = amount
         self.net_values = np.array([])
@@ -92,13 +95,10 @@ class Layer:
         self.sd = []
         self.active_set = 1
 
-    def deactivate(self):
-        self.net_values = self.net_values * self.active_set
-
     def normalize(self):
-        self.sd = np.sqrt(np.var(self.net_values, axis=0))
+        self.sd = np.sqrt(np.var(self.net_values, axis=0) + EPS)
         ave = np.average(self.net_values, axis=0)
-        self.net_values = (self.net_values - ave) / (self.sd + EPS)
+        self.net_values = (self.net_values - ave) / (self.sd)
 
     def activate(self):
         batch_size = self.net_values.shape[0]
@@ -107,7 +107,7 @@ class Layer:
 
     def calc_net_values(self):
         self.lag_weights.lag_layer.net_values \
-            = np.dot(self.activated_values, (self.lag_weights.weight * self.lag_weights.active_set))
+            = np.dot(self.activated_values, (self.lag_weights.weight * self.lag_weights.active_set)) * self.lag_weights.lag_layer.active_set + EPS
 
     def calc_delta(self, labels: list):
         norm_diff = (1/(BATCH_SIZE * self.sd))*(BATCH_SIZE - (self.net_values ** 2) - 1)
@@ -122,26 +122,38 @@ class Layer:
         :param ratio: 非active化する割合
         :return: None
         """
-        pass
+        # lead_weightの集計
+        # lag_weightの集計
+        # active_set 1次元配列の作成
+        lead_weight_l1 = np.sum(np.abs(self.lead_weights.weight * self.lead_weights.active_set), axis=0)
+        lag_weight_l1 = np.sum(np.abs(self.lag_weights.weight * self.lag_weights.active_set), axis=1)[:-1]
+        weights_abs_sum = lead_weight_l1 + lag_weight_l1
+        sd = np.sqrt(np.var(weights_abs_sum))
+        ave = np.average(weights_abs_sum)
+        self.active_set = np.where(weights_abs_sum > (ave-sd),1,0)
 
     def delete_node(self):
         """
         非activeなノードを削除する
         削除したノードに繋がる重みも列（行）を一括で削除する
-        :return: None
+        :return: 削除後のノード数
         """
-        pass
-
+        # net_value削除
+        # lag_weightの該当列削除
+        # lead_weightの該当行削除
+        self.lag_weights.weight.shape
+        self.lag_weights.weight.shape
+        c = 0
+        for i in range(self.active_set.size):
+            if not self.active_set[i]:
+                self.lead_weights.weight = np.delete(self.lead_weights.weight, i - c, axis=1)
+                self.lead_weights.active_set = np.delete(self.lead_weights.active_set, i - c, axis=1)
+                self.lag_weights.weight = np.delete(self.lag_weights.weight,i - c, axis=0)
+                self.lag_weights.active_set = np.delete(self.lag_weights.active_set,i - c, axis=0)
+                c += 1
+        return np.sum(self.active_set)
 
 class SigmoidLayer(Layer):
-    def normalize(self):
-        sd = []
-        ave = []
-        for v in self.net_values.T:
-            sd.append(float(np.sqrt(np.var(v) + 0.0001)))  # avoid 0 divide
-            ave.append(float(np.average(v)))
-        self.sd = np.array(sd)
-        self.net_values = (self.net_values - np.array(ave)) / self.sd
 
     def activate(self):
         batch_size = self.net_values.shape[0]
@@ -183,27 +195,27 @@ class SoftMaxLayer(Layer):
 
 
 class NetWork:
-    def __init__(self, hidden_layer: int, input_dim: int, activation: int, optimizer: int):
+    def __init__(self, hidden_layer: int, in_dim: int, activation: int, optimizer: int, md1: int, md2: int, out_dim: int):
         self.hidden_layer = hidden_layer
-        self.input_dim = input_dim
         self.activation = activation
         self.layers = []
+        self.layer_dims = [in_dim, md1, md2, out_dim]
 
         # set layers
         if activation == SIGMOID:
-            self.layers.append(SigmoidLayer(input_dim))
+            self.layers.append(SigmoidLayer(in_dim))
             for i in range(hidden_layer - 1):
-                self.layers.append(SigmoidLayer(MD1))
-            self.layers.append(SigmoidLayer(MD2))
+                self.layers.append(SigmoidLayer(md1))
+            self.layers.append(SigmoidLayer(md2))
         elif activation == ReLU:
-            self.layers.append(Layer(input_dim))
+            self.layers.append(Layer(in_dim))
             for i in range(hidden_layer - 1):
-                self.layers.append(Layer(MD1))
-            self.layers.append(Layer(MD2))
+                self.layers.append(Layer(md1))
+            self.layers.append(Layer(md2))
         else:
             print("bad input: activation_func")
             sys.exit()
-        self.layers.append(SoftMaxLayer(CLASS_NUM))
+        self.layers.append(SoftMaxLayer(out_dim))
 
         # set optimizer
         if optimizer == ADAM:
@@ -288,9 +300,9 @@ class NetWork:
         self.previous_weights = self.weights
         self.layers = self.layers[:-2]
         if self.activation == SIGMOID:
-            self.layers.extend([SigmoidLayer(MD1), SigmoidLayer(MD2), SoftMaxLayer(CLASS_NUM)])
+            self.layers.extend([SigmoidLayer(self.layer_dims[1]), SigmoidLayer(self.layer_dims[-2]), SoftMaxLayer(self.layer_dims[-1])])
         if self.activation == ReLU:
-            self.layers.extend([Layer(MD1), Layer(MD2), SoftMaxLayer(CLASS_NUM)])
+            self.layers.extend([Layer(self.layer_dims[1]), Layer(self.layer_dims[-2]), SoftMaxLayer(self.layer_dims[-1])])
         self.weights = []
         self.__init_weight(len(self.weights))
         for target, previous in zip(self.weights[:-3], self.previous_weights):
@@ -302,18 +314,18 @@ class NetWork:
     def rollback_layer(self):
         layers = []
         if self.activation == SIGMOID:
-            layers.append(SigmoidLayer(self.input_dim))
+            layers.append(SigmoidLayer(self.layer_dims[0]))
             for i in range(len(self.layers)-4):
-                layers.append(SigmoidLayer(MD1))
-            layers.append(SigmoidLayer(MD2))
+                layers.append(SigmoidLayer(self.layer_dims[1]))
+            layers.append(SigmoidLayer(self.layer_dims[-2]))
         if self.activation == ReLU:
-            layers.append(Layer(self.input_dim))
+            layers.append(Layer(self.layer_dims[0]))
             for i in range(len(self.layers)-4):
-                layers.append(Layer(MD1))
-            layers.append(Layer(MD2))
-        layers.append(SoftMaxLayer(CLASS_NUM))
+                layers.append(Layer(self.layer_dims[1]))
+            layers.append(Layer(self.layer_dims[-2]))
+        layers.append(SoftMaxLayer(self.layer_dims[-1]))
         self.layers = layers
-        self.weights = []
+        seweights = []
         self.__init_weight()
         for target, previous in zip(self.weights, self.previous_weights):
             target.weight = previous.weight
@@ -367,13 +379,18 @@ class NetWork:
         # check is_not_decline
         if not prev_error - now_error < 0.05:
             # rollback
+            for l in self.layers[-3:-1]:
+                l.active_set = 1
             # decline_ratio
-            return None
+            self.deactivate_ratio = self.deactivate_ratio/ 2
         print("sparse")
-        for l in self.layers[-3:]:
+        for l, d in zip(self.layers[-3:-1],self.layer_dims[-3:-1]):
             if l.lead_weights:
-                if l.active_set:
-                    l.delete_node()
+                if isinstance(l.active_set, np.ndarray):
+                    node_amount = l.delete_node()
+                    l.node_amount = node_amount
+                    d = node_amount
+
                 l.make_active_set(self.deactivate_ratio)
         for w in self.weights:
             w.make_active_set(self.deactivate_ratio)
