@@ -39,6 +39,7 @@ def main(data_set):
     time2 = time.time()
     # print("format_complete time:{0}".format(time2 - time1))
     for model in models:
+        latest_epoch = 0
         time2 = time.time()
         c = 0
         train_accuracy = []
@@ -53,7 +54,7 @@ def main(data_set):
         while is_proved:
             while not early_stopping(err, start):
                 time3 = time.time()
-                # print("epoch{0} train_start".format(c))
+                print("epoch{0} train_start".format(c))
                 data, label = shuffle_data(train_data[:SAMPLE_SIZE], train_label[:SAMPLE_SIZE])
                 # data, label = shuffle_data(train_data, train_label)
                 data, label = transform_data(data, label)
@@ -72,20 +73,19 @@ def main(data_set):
                 l1_norm.append(test_info[2])
                 l2_norm.append(test_info[3])
                 node_amount.append(test_info[4])
+                latest_epoch = model.propose_method(accuracy, latest_epoch)
                 c += 1
-                if not (c - start) % 5 and c >= 10:
-                    model.propose_method(err[-5], err[-1])
                 # plot_fig(accuracy, err, l1_norm, l2_norm, node_amount, c, model)
             # print("early_stopping, epochs: {0}".format(c-start))
             if model.is_proved(accuracy):
                 model.add_layer()
-                # print("add_layer")
+                print("add_layer")
                 start = c
             else:
                 is_proved = False
         # additional leaning
         model.rollback_layer()
-        # print("decision layer num, start additional learning")
+        print("decision layer num, start additional learning")
         for i in range(10):
             data, label = shuffle_data(train_data[:SAMPLE_SIZE], train_label[:SAMPLE_SIZE])
             data, label = transform_data(data, label)

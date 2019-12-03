@@ -84,6 +84,8 @@ class Weights:
         border = np.sort(np.abs(self.weight.flat))[deactive_amount]
         self.active_set = np.where(np.abs(self.weight) < border, 0, 1)
         print(self.weight.shape)
+        print(np.sum(self.active_set), "/", self.active_set.size)
+
 
 class Layer: 
     def __init__(self, amount: int):
@@ -100,7 +102,7 @@ class Layer:
     def normalize(self):
         self.sd = np.sqrt(np.var(self.net_values, axis=0) + EPS)
         ave = np.average(self.net_values, axis=0)
-        self.net_values = (self.net_values - ave) / (self.sd)
+        self.net_values = (self.net_values - ave) / self.sd
 
     def activate(self):
         batch_size = self.net_values.shape[0]
@@ -109,12 +111,13 @@ class Layer:
 
     def calc_net_values(self):
         self.lag_weights.lag_layer.net_values \
-            = np.dot(self.activated_values, (self.lag_weights.weight * self.lag_weights.active_set)) * self.lag_weights.lag_layer.active_set + EPS
+            = np.dot(self.activated_values, (self.lag_weights.weight * self.lag_weights.active_set)) *\
+            self.lag_weights.lag_layer.active_set + EPS
 
     def calc_delta(self, labels: list):
         norm_diff = (1/(BATCH_SIZE * self.sd))*(BATCH_SIZE - (self.net_values ** 2) - 1)
         round_z = self.lag_weights.lag_layer.delta.dot(self.lag_weights.weight[:-1].T) * norm_diff
-        self.delta = round_z * (self.net_values * (self.net_values > 0))/ self.net_values
+        self.delta = round_z * (self.net_values * (self.net_values > 0)) / self.net_values
 
     def make_active_set(self, ratio):
         """
@@ -138,15 +141,16 @@ class Layer:
         lead_weight = self.lead_weights.weight
         lead_weight_l1 = np.sum(np.abs(self.lead_weights.weight * self.lead_weights.active_set), axis=0)
         lag_weight_l1 = np.sum(np.abs(self.lag_weights.weight * self.lag_weights.active_set), axis=1)[:-1]
-        weights_l1_nrom_sum = lead_weight_l1 + lag_weight_l1
-        norm = (lead_weight ** 2).sum(0, keepdims = True) ** .5
-        cos_similarity =1 - (lead_weight.T @ lead_weight/ norm / norm.T)
-        max_similarity = [np.min(np.delete(cos_similarity[i], [i])) for i in range(cos_similarity.shape[0])]
-        similarity = np.abs(np.log(max_similarity))
-        deactivate_priority = weights_l1_nrom_sum * similarity
+        deactivate_priority = lead_weight_l1 + lag_weight_l1
+        norm = (lead_weight ** 2).sum(0, keepdims=True) ** .5
+        cos_similarity = lead_weight.T @ lead_weight / norm / norm.T
+        max_similarity = [np.max(cos_similarity[i][i + 1:]) for i in range(cos_similarity.shape[0] - 1)]
+        max_similarity.append(0)
+        print(active_amount)
         border = np.sort(deactivate_priority.flat)[active_amount]
-        self.active_set = np.where(deactivate_priority > border,0, 1)
-        self.active_set = self.active_set * current_active_magnification * (self.active_set.size / np.sum(self.active_set))
+        self.active_set = np.where(deactivate_priority > border, 0, 1) * np.where(np.array(max_similarity) > 0.7, 0, 1)
+        self.active_set = self.active_set * current_active_magnification * (self.active_set.size
+                                                                            / np.sum(self.active_set))
 
     def delete_node(self, optimizer):
         """
@@ -162,20 +166,21 @@ class Layer:
             if self.active_set[i] == 0:
                 self.lead_weights.weight = np.delete(self.lead_weights.weight, i - c, axis=1)
                 self.lead_weights.active_set = np.delete(self.lead_weights.active_set, i - c, axis=1)
-                self.lag_weights.weight = np.delete(self.lag_weights.weight,i - c, axis=0)
-                self.lag_weights.active_set = np.delete(self.lag_weights.active_set,i - c, axis=0)
+                self.lag_weights.weight = np.delete(self.lag_weights.weight, i - c, axis=0)
+                self.lag_weights.active_set = np.delete(self.lag_weights.active_set, i - c, axis=0)
                 c += 1
                 if isinstance(optimizer, Adam):
                     self.lead_weights.optimizer.mt = np.delete(self.lead_weights.optimizer.mt, i - c, axis=1)
                     self.lead_weights.optimizer.vt = np.delete(self.lead_weights.optimizer.vt, i - c, axis=1)
-                    self.lag_weights.optimizer.mt = np.delete(self.lag_weights.optimizer.mt,i - c, axis=0)
-                    self.lag_weights.optimizer.vt = np.delete(self.lag_weights.optimizer.vt,i - c, axis=0)
+                    self.lag_weights.optimizer.mt = np.delete(self.lag_weights.optimizer.mt, i - c, axis=0)
+                    self.lag_weights.optimizer.vt = np.delete(self.lag_weights.optimizer.vt, i - c, axis=0)
                 if isinstance(optimizer, MomentumSgd):
-                    self.lead_weights.optimizer.moment= np.delete(self.lead_weights.optimizer.moment, i - c, axis=1)
-                    self.lag_weights.optimizer.moment= np.delete(self.lag_weights.optimizer.moment, i - c, axis=0)
+                    self.lead_weights.optimizer.moment = np.delete(self.lead_weights.optimizer.moment, i - c, axis=1)
+                    self.lag_weights.optimizer.moment = np.delete(self.lag_weights.optimizer.moment, i - c, axis=0)
         self.node_amount = int(round(np.sum(self.active_set)/np.max(self.active_set.flat)))
         print(self.node_amount)
         return self.node_amount
+
 
 class SigmoidLayer(Layer):
 
@@ -219,7 +224,8 @@ class SoftMaxLayer(Layer):
 
 
 class NetWork:
-    def __init__(self, hidden_layer: int, in_dim: int, activation: int, optimizer: int, md1: int, md2: int, out_dim: int):
+    def __init__(self, hidden_layer: int, in_dim: int, activation: int,
+                 optimizer: int, md1: int, md2: int, out_dim: int):
         self.hidden_layer = hidden_layer
         self.activation = activation
         self.layers = []
@@ -255,10 +261,10 @@ class NetWork:
         self.weights = []
         self.__init_weight()
         self.last_accuracy = None
-        self.previous_weights = None
-        self.deactivate_ratio = {"input_node": {"ratio": 0.1,"alfa": 0.9}, 
-                                 "weight": {"ratio": 0.2,"alfa": 0.9}, 
-                                 "node": {"ratio": 0.4,"alfa": 0.5}}  # target: [deactive_ratio, decline_ratio]
+        self.previous_info = {"weights": [], "layers": [], "layer_dims": []}
+        self.deactivate_ratio = {"input_node": {"ratio": 0.1, "alfa": 0.9},
+                                 "weight": {"ratio": 0.2, "alfa": 0.9},
+                                 "node": {"ratio": 0.6, "alfa": 0.5}}  # target: [deactive_ratio, decline_ratio]
 
     def __init_weight(self, i: int = 0):
         for lead, lag in zip(self.layers[i:-1], self.layers[i + 1:]):
@@ -294,7 +300,7 @@ class NetWork:
             for weight in self.weights[-index:]:
                 weight.calc_grad()
                 weight.optimize()
-        return accuracy/SAMPLE_SIZE, error/SAMPLE_SIZE
+        return accuracy/SAMPLE_SIZE, error / SAMPLE_SIZE
 
     def test(self, test_data: np.array, test_labels: list) -> tuple:
         self.layers[0].net_values = test_data
@@ -304,8 +310,8 @@ class NetWork:
             layer.activate()
             layer.calc_net_values()
         accuracy = self.calc_correct_num(test_labels) / data_amount
-        error_average = self.calc_error_sum(test_labels) / data_amount
-        return accuracy, error_average, self.l1_norm(), self.l2_norm(), self.total_node()
+        error = self.calc_error_sum(test_labels) / data_amount
+        return accuracy, error, self.l1_norm(), self.l2_norm(), self.total_node()
 
     def is_proved(self, accuracy: list) -> bool:
         if not accuracy:
@@ -323,38 +329,36 @@ class NetWork:
         """
         重み情報を保存し層を追加して重みの初期化をする
         """
-        self.previous_weights = self.weights
+        self.previous_info["weights"] = copy.deepcopy(self.weights)
+        self.previous_info["layers"] = copy.deepcopy(self.layers)
+        self.previous_info["layer_dims"] = copy.deepcopy(self.layer_dims)
         self.layers = self.layers[:-2]
         if self.activation == SIGMOID:
-            self.layers.extend([SigmoidLayer(self.layer_dims[1]), SigmoidLayer(self.layer_dims[-2]), SoftMaxLayer(self.layer_dims[-1])])
+            self.layers.extend([SigmoidLayer(self.layer_dims[1]),
+                                SigmoidLayer(self.layer_dims[-2]), SoftMaxLayer(self.layer_dims[-1])])
         if self.activation == ReLU:
-            self.layers.extend([Layer(self.layer_dims[1]), Layer(self.layer_dims[-2]), SoftMaxLayer(self.layer_dims[-1])])
+            self.layers.extend([Layer(self.layer_dims[1]),
+                                Layer(self.layer_dims[-2]), SoftMaxLayer(self.layer_dims[-1])])
         self.weights = []
         self.__init_weight(len(self.weights))
-        for target, previous in zip(self.weights[:-3], self.previous_weights):
-            target.weight = previous.weight
+        for target, previous in zip(self.weights[:-3], self.previous_info["weights"]):
+            target.weight = copy.deepcopy(previous.weight)
             target.is_fixed = True
         for w in self.weights:
             w.optimizer.reset()
+        self.layer_dims = []
+        for l in self.layers:
+            self.layer_dims.append(l.node_amount)
 
     def rollback_layer(self):
-        layers = []
-        if self.activation == SIGMOID:
-            layers.append(SigmoidLayer(self.layer_dims[0]))
-            for i in range(len(self.layers[1:-2])):
-                layers.append(SigmoidLayer(self.layer_dims[1]))
-            layers.append(SigmoidLayer(self.layer_dims[-2]))
-        if self.activation == ReLU:
-            layers.append(Layer(self.layer_dims[0]))
-            for i in range(len(self.layers[1:-2])):
-                layers.append(Layer(self.layer_dims[1]))
-            layers.append(Layer(self.layer_dims[-2]))
-        layers.append(SoftMaxLayer(self.layer_dims[-1]))
-        self.layers = layers
-        seweights = []
-        self.__init_weight()
-        for target, previous in zip(self.weights, self.previous_weights):
-            target.weight = previous.weight
+        self.layers = self.previous_info["layers"]
+        self.layer_dims = self.previous_info["layer_dims"]
+        self.weights = self.previous_info["weights"]
+        for i, w in enumerate(self.weights):
+            self.weights[i].lead_layer = self.layers[i]
+            self.layers[i].lag_weight = self.weights[i]
+            self.weights[i].lag_layer = self.layers[i + 1]
+            self.layers[i + 1].lag_weight = self.weights[i]
 
     def l1_norm(self) -> float:
         norm = 0
@@ -397,33 +401,50 @@ class NetWork:
                 acc += 1
         return acc
 
-    def propose_method(self, prev_error, now_error) -> None:
+    def propose_method(self, accuracy_list: list, latest_epoch: int) -> int:
         """
         ノードと重みのスパース推定を行う
+        入力から3つのオペレーションを行う
+        １: 最後にスパース化してからまだ性能が向上しそうな場合：　何も処理せずにlatest_epochを返す
+        2: 最後にスパース化してから、する前の性能以上の性能が出た場合： さらにスパース化する
+        3: 性能向上が頭打ちになって、スパース化する前の性能を下回りそうな場合： ロールバックしてレートを落とす
         """
         input_layer = self.layers[0]
-        # check is_not_decline
-        if prev_error - now_error < 0.1 and self.layers[1].active_set.size == np.sum(self.layers[1].active_set):
-        # rollback and ratio decliment
-            if len(self.layers) == 4:
-                input_layer.active_set = np.ones(input_layer.node_amount)
-                self.deactivate_ratio["input_node"]["ratio"] *= self.deactivate_ratio["input_node"]["alfa"]
-            for l in self.layers[-3:-1]:
+
+        # operation_1 スパース化してからの最高の性能が出てから一定エポックが経過していない
+        target = accuracy_list[latest_epoch:]
+        if not target or len(target) - max(enumerate(target), key=lambda x: x[1])[0] < 5:
+            return latest_epoch
+
+        # 性能が低下したと認められる場合、ロールバックしてレートを落とす
+        previous_accuracy = accuracy_list[:latest_epoch]
+        if previous_accuracy and max(target) < max(previous_accuracy):
+            print("rollback")
+            # if len(self.layers) == 4:
+            #    input_layer.active_set = np.ones(input_layer.node_amount)
+            #    self.deactivate_ratio["input_node"]["ratio"] *= self.deactivate_ratio["input_node"]["alfa"]
+            for i, l in enumerate(self.layers[-3:-1]):
                 l.active_set = np.ones(l.node_amount)
+                l.node_amount = l.active_set.size
+                self.layer_dims[-3 + i] = l.active_set.size
                 self.deactivate_ratio["node"]["ratio"] *= self.deactivate_ratio["node"]["alfa"]
             for w in self.weights:
                 w.active_set = w.previous_active_set
                 self.deactivate_ratio["weight"]["ratio"] *= self.deactivate_ratio["weight"]["alfa"]
-        print("sparse")
 
+        # スパース化
+        print("sparse")
         # if len(self.layers) == 4:
         #    node_amount =  input_layer.delete_node(None)
         #    self.layer_dims[1] = node_amount
         #    input_layer.make_active_set(self.deactivate_ratio["input_node"]["ratio"])
-        for l, d in zip(self.layers[-3:-1],self.layer_dims[-3:-1]):
+        for i, l in enumerate(self.layers[-3:-1]):
             if not l.lead_weights is None:
                 node_amount = l.delete_node(self.optimizer)
+                self.layer_dims[-3 + i] = node_amount
                 l.make_active_set(self.deactivate_ratio["node"]["ratio"])
-
+        print(self.layer_dims)
         for w in self.weights:
             w.make_active_set(self.deactivate_ratio["weight"]["ratio"])
+
+        return len(accuracy_list) - 1
