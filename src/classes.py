@@ -408,7 +408,7 @@ class NetWork:
         １: 最後にスパース化してからまだ性能が向上しそうな場合：　何も処理せずにlatest_epochを返す
         2: 最後にスパース化してから、する前の性能以上の性能が出た場合： さらにスパース化する
         3: 性能向上が頭打ちになって、スパース化する前の性能を下回りそうな場合： ロールバックしてレートを落とす
-        """
+
         input_layer = self.layers[0]
 
         # operation_1 スパース化してからの最高の性能が出てから一定エポックが経過していない
@@ -448,3 +448,5 @@ class NetWork:
             w.make_active_set(self.deactivate_ratio["weight"]["ratio"])
 
         return len(accuracy_list) - 1
+        """
+        return latest_epoch
