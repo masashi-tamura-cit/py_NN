@@ -24,12 +24,18 @@ def main(data_set):
     else:
         print("wrong dataset")
         sys.exit()
-    # models.append(NetWork(hidden_layer=2, input_dim=data_set[DataLength], activation=ReLU, optimizer=ADAM))
     models.append(NetWork(2, data_set[DataLength], ReLU, SGD, 500, 1000, CLASS_NUM))
-    # models.append(NetWork(hidden_layer=2, input_dim=data_set[DataLength], activation=ReLU, optimizer=MOMENTUM_SGD))
-    # models.append(NetWork(hidden_layer=2, input_dim=data_set[DataLength], activation=SIGMOID, optimizer=ADAM))
-    # models.append(NetWork(hidden_layer=2, input_dim=data_set[DataLength], activation=SIGMOID, optimizer=SGD))
-    # models.append(NetWork(hidden_layer=2, input_dim=data_set[DataLength], activation=SIGMOID, optimizer=MOMENTUM_SGD))
+    models.append(NetWork(2, data_set[DataLength], ReLU, MOMENTUM_SGD, 500, 1000, CLASS_NUM))
+    models.append(NetWork(2, data_set[DataLength], ReLU, ADAM, 500, 1000, CLASS_NUM))
+    models.append(NetWork(2, data_set[DataLength], ReLU, SGD, 500, 500, CLASS_NUM))
+    models.append(NetWork(2, data_set[DataLength], ReLU, MOMENTUM_SGD, 500, 500, CLASS_NUM))
+    models.append(NetWork(2, data_set[DataLength], ReLU, ADAM, 500, 500, CLASS_NUM))
+    models.append(NetWork(2, data_set[DataLength], ReLU, SGD, 1000, 1000, CLASS_NUM))
+    models.append(NetWork(2, data_set[DataLength], ReLU, MOMENTUM_SGD, 1000, 1000, CLASS_NUM))
+    models.append(NetWork(2, data_set[DataLength], ReLU, ADAM, 1000, 1000, CLASS_NUM))
+    models.append(NetWork(2, data_set[DataLength], SIGMOID, ADAM, 500, 1000, CLASS_NUM))
+    models.append(NetWork(2, data_set[DataLength], SIGMOID, MOMENTUM_SGD, 500, 1000, CLASS_NUM))
+    models.append(NetWork(2, data_set[DataLength], SIGMOID, SGD, 500, 1000, CLASS_NUM))
     time2 = time.time()
     # print("format_complete time:{0}".format(time2 - time1))
     for model in models:
@@ -67,7 +73,7 @@ def main(data_set):
                 l2_norm.append(test_info[3])
                 node_amount.append(test_info[4])
                 c += 1
-                if not (c - start) % 5:
+                if not (c - start) % 5 and c >= 10:
                     model.propose_method(err[-5], err[-1])
                 # plot_fig(accuracy, err, l1_norm, l2_norm, node_amount, c, model)
             # print("early_stopping, epochs: {0}".format(c-start))
@@ -325,6 +331,6 @@ def make_csv(title, exec_time, train_accuracy, train_error, accuracy, error, l1_
 
 if __name__ == "__main__":
     # print("IMPORTANT!")
-    for _ in range(1):
-        main(MNIST)
+    for _ in range(2):
         # main(CIFAR10)
+        main(MNIST)
