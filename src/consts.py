@@ -48,4 +48,4 @@ ALPHA = 0.01
 BETA1 = 0.9
 BETA2 = 0.999
 EPS = pow(10, -8)
-LAMBDA = 0.001  # for norm
+LAMBDA = 0.0  # for norm

@@ -83,8 +83,6 @@ class Weights:
         self.previous_active_set = self.active_set
         border = np.sort(np.abs(self.weight.flat))[deactive_amount]
         self.active_set = np.where(np.abs(self.weight) < border, 0, 1)
-        print(self.weight.shape)
-        print(np.sum(self.active_set), "/", self.active_set.size)
 
 
 class Layer: 
@@ -146,7 +144,6 @@ class Layer:
         cos_similarity = lead_weight.T @ lead_weight / norm / norm.T
         max_similarity = [np.max(cos_similarity[i][i + 1:]) for i in range(cos_similarity.shape[0] - 1)]
         max_similarity.append(0)
-        print(active_amount)
         border = np.sort(deactivate_priority.flat)[active_amount]
         self.active_set = np.where(deactivate_priority > border, 0, 1) * np.where(np.array(max_similarity) > 0.7, 0, 1)
         self.active_set = self.active_set * current_active_magnification * (self.active_set.size
@@ -281,7 +278,8 @@ class NetWork:
         error = 0
         accuracy = 0
         if not train_layer_num:
-            index = 3
+            # index = 3
+            index = len(self.weights)
         else:
             index = train_layer_num
         for item, key in zip(train_data, labels):
@@ -300,7 +298,7 @@ class NetWork:
             for weight in self.weights[-index:]:
                 weight.calc_grad()
                 weight.optimize()
-        return accuracy/SAMPLE_SIZE, error / SAMPLE_SIZE
+        return accuracy/SAMPLE_SIZE, error / SAMPLE_SIZE, self.weight_active_percent()
 
     def test(self, test_data: np.array, test_labels: list) -> tuple:
         self.layers[0].net_values = test_data
@@ -433,7 +431,6 @@ class NetWork:
                 self.deactivate_ratio["weight"]["ratio"] *= self.deactivate_ratio["weight"]["alfa"]
 
         # スパース化
-        print("sparse")
         # if len(self.layers) == 4:
         #    node_amount =  input_layer.delete_node(None)
         #    self.layer_dims[1] = node_amount
@@ -443,8 +440,15 @@ class NetWork:
                 node_amount = l.delete_node(self.optimizer)
                 self.layer_dims[-3 + i] = node_amount
                 l.make_active_set(self.deactivate_ratio["node"]["ratio"])
-        print(self.layer_dims)
         for w in self.weights:
             w.make_active_set(self.deactivate_ratio["weight"]["ratio"])
 
         return len(accuracy_list) - 1
+
+    def weight_active_percent(self):
+        all_weight_amount = 0
+        active_weight_amount = 0
+        for w in self.weights:
+            all_weight_amount += w.active_set.size
+            active_weight_amount += np.sum(w.active_set)
+        return active_weight_amount / all_weight_amount

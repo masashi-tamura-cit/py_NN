@@ -25,20 +25,10 @@ def main(data_set):
         print("wrong dataset")
         sys.exit()
     models.append(NetWork(2, data_set[DataLength], ReLU, SGD, 500, 1000, CLASS_NUM))
-    models.append(NetWork(2, data_set[DataLength], ReLU, MOMENTUM_SGD, 500, 1000, CLASS_NUM))
-    models.append(NetWork(2, data_set[DataLength], ReLU, ADAM, 500, 1000, CLASS_NUM))
-    models.append(NetWork(2, data_set[DataLength], ReLU, SGD, 500, 500, CLASS_NUM))
-    models.append(NetWork(2, data_set[DataLength], ReLU, MOMENTUM_SGD, 500, 500, CLASS_NUM))
-    models.append(NetWork(2, data_set[DataLength], ReLU, ADAM, 500, 500, CLASS_NUM))
-    models.append(NetWork(2, data_set[DataLength], ReLU, SGD, 1000, 1000, CLASS_NUM))
-    models.append(NetWork(2, data_set[DataLength], ReLU, MOMENTUM_SGD, 1000, 1000, CLASS_NUM))
-    models.append(NetWork(2, data_set[DataLength], ReLU, ADAM, 1000, 1000, CLASS_NUM))
-    models.append(NetWork(2, data_set[DataLength], SIGMOID, ADAM, 500, 1000, CLASS_NUM))
-    models.append(NetWork(2, data_set[DataLength], SIGMOID, MOMENTUM_SGD, 500, 1000, CLASS_NUM))
-    models.append(NetWork(2, data_set[DataLength], SIGMOID, SGD, 500, 1000, CLASS_NUM))
     time2 = time.time()
     # print("format_complete time:{0}".format(time2 - time1))
     for model in models:
+        weight_active_percent = []
         latest_epoch = 0
         time2 = time.time()
         c = 0
@@ -70,6 +60,7 @@ def main(data_set):
                 print("l1_norm:{0}, l2_norm:{1}, node_amount{2}".format(test_info[2], test_info[3], test_info[4]))
                 accuracy.append(test_info[0])
                 err.append(test_info[1])
+                weight_active_percent.append(train_info[2])
                 l1_norm.append(test_info[2])
                 l2_norm.append(test_info[3])
                 node_amount.append(test_info[4])
@@ -89,8 +80,11 @@ def main(data_set):
         for i in range(10):
             data, label = shuffle_data(train_data[:SAMPLE_SIZE], train_label[:SAMPLE_SIZE])
             data, label = transform_data(data, label)
-            model.training(data, label, 2)
+            train_info = model.training(data, label, 2)
             test_info = model.test(test_data[:VALIDATION_DATA], test_label[:VALIDATION_DATA])
+            train_accuracy.append(train_info[0])
+            train_error.append(train_info[1])
+            weight_active_percent.append(train_info[2])
             accuracy.append(test_info[0])
             err.append(test_info[1])
             l1_norm.append(test_info[2])
@@ -100,8 +94,11 @@ def main(data_set):
         for i in range(10):
             data, label = shuffle_data(train_data[:SAMPLE_SIZE], train_label[:SAMPLE_SIZE])
             data, label = transform_data(data, label)
-            model.training(data, label, 1)
+            train_info = model.training(data, label, 1)
             test_info = model.test(test_data[:VALIDATION_DATA], test_label[:VALIDATION_DATA])
+            train_accuracy.append(train_info[0])
+            train_error.append(train_info[1])
+            weight_active_percent.append(train_info[2])
             accuracy.append(test_info[0])
             err.append(test_info[1])
             l1_norm.append(test_info[2])
@@ -117,7 +114,8 @@ def main(data_set):
         # print("latest error:{0}".format(test_info[1]))
 
         title = plot_fig(accuracy, err, l1_norm, l2_norm, node_amount, c, model)
-        make_csv(title, exec_time, train_accuracy, train_error, accuracy, err, l1_norm, node_amount)
+        make_csv(title, exec_time, train_accuracy, train_error,
+                 accuracy, err, l1_norm, node_amount, weight_active_percent)
     print("total {0}min".format(int((time5 - time1)/60)))
 
 
@@ -306,7 +304,7 @@ def plot_fig(accuracy: list, err: list, l1_norm: list, l2_norm: list, total_amou
     return title
 
 
-def make_csv(title, exec_time, train_accuracy, train_error, accuracy, error, l1_norm, node_amount):
+def make_csv(title, exec_time, train_accuracy, train_error, accuracy, error, l1_norm, node_amount, weights):
     """
     学習時の情報をCSV化するメソッド e.g. "MNIST_500-1000_Adam_Sigmoid_11251759.csv"
     :param title: ファイル名 str
@@ -317,20 +315,21 @@ def make_csv(title, exec_time, train_accuracy, train_error, accuracy, error, l1_
     :param error: 誤差関数値 list
     :param l1_norm: 重みの絶対値和 list
     :param node_amount: ノード数 list
+    :param weights: 重みのアクティブ率
     :return: None
     """
-    columns = ["train_accuracy", "train_error", "accuracy", "error", "L1_norm", "node_amount"]
+    columns = ["train_accuracy", "train_error", "accuracy", "error", "L1_norm", "node_amount", "node_active_percent"]
     file_title = "{0}_{1:%m%d%H%M}.csv".format(title, exec_time).replace(", ", "_")
     file_path = os.path.join(DATA_DIR, file_title)
     with open(file_path, 'w', newline="") as f:
         writer = csv.writer(f)
         writer.writerow(columns)
-        for data in zip(train_accuracy, train_error, accuracy, error, l1_norm, node_amount):
+        for data in zip(train_accuracy, train_error, accuracy, error, l1_norm, node_amount, weights):
             writer.writerow(data)
 
 
 if __name__ == "__main__":
     # print("IMPORTANT!")
-    for _ in range(2):
+    for _ in range(10):
         # main(CIFAR10)
         main(MNIST)
