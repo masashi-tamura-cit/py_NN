@@ -235,6 +235,7 @@ class NetWork:
         self.is_dynamic = dynamic
         self.is_propose = propose
         self.layer_dims = [in_dim, md1, md2, out_dim]
+        self.property_str = self.__set_property_str(in_dim, md1, md2, optimizer, activation)
 
         # set layers
         if activation == SIGMOID:
@@ -268,8 +269,32 @@ class NetWork:
         self.last_accuracy = None
         self.previous_info = {"weights": [], "layers": [], "layer_dims": []}
         self.deactivate_ratio = {"input_node": {"ratio": 0.1, "alfa": 0.9},
-                                 "weight": {"ratio": 0.2, "alfa": 0.9},
+                                 "weight": {"ratio": 0.3, "alfa": 0.9},
                                  "node": {"ratio": 0.6, "alfa": 0.5}}  # target: [deactive_ratio, decline_ratio]
+
+    def __set_property_str(self, in_dim, md1, md2, optimizer, activation):
+        """
+        self.hidden_layer
+        self.in_dim
+        self.is_dynamic
+        self.is_propose
+        あと入力情報からディレクトリ名に使う文字列を生成する
+        :return: ディレクトリ名文字列
+        e.g. MNIST_dynamic_propose_2_50_100_Adam0.01_ReLU
+             CIFAR10_static__3_500_1000_Momentum0.1_Sigmoid
+        """
+        if optimizer == ADAM:
+            opt = "Adam"
+        elif optimizer == MOMENTUM_SGD:
+            opt = "Momentum"
+        else:
+            opt = "SGD"
+        data = "MNIST" if in_dim == 784 else "CIFAR10"
+        activator = "ReLU" if activation == ReLU else "sigmoid"
+        state = "dynamic"if self.is_dynamic else "static"
+        propose = "propose" if self.is_propose else ""
+        return "PRIME_{0}_{1}_{2}_{3}_{4}_{5}_{6}{7}_{8}".format(data, state, propose, self.hidden_layer,
+                                                                 md1, md2, opt, ETA, activator)
 
     def __init_weight(self, i: int = 0):
         for lead, lag in zip(self.layers[i:-1], self.layers[i + 1:]):

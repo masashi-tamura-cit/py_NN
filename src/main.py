@@ -51,7 +51,7 @@ def main(model, dataset):
             training_information_dict = save_info(train_info, test_info, training_information_dict)
             c += 1
     print("train_end, total_time: {0}".format(training_information_dict["total_time"][-1]))
-    make_csv(training_information_dict)
+    make_csv(training_information_dict, model.property_str)
 
 
 def read_cifar10() -> tuple:
@@ -193,18 +193,21 @@ def early_stopping(err: list, start) -> bool:
     return True
 
 
-def make_csv(information_dict: dict):
+def make_csv(information_dict: dict, dir_name: str):
     """
     学習時の情報をCSV化するメソッド e.g. "MNIST_500-1000_Adam_Sigmoid_11251759.csv"
     :param information_dict: 出力したい全ての情報が入った辞書
+    :param dir_name: ディレクトリ名 なければ新たに生成する
     :return: None
     """
     exec_time = datetime.datetime.now()
-    title = ""
+    file_title = "{0:%m%d%H%M}.csv".format(exec_time)
+    output_dir = os.path.join(OUTPUT_DIR, dir_name)
+    if not os.path.exists(output_dir):
+        os.mkdir(output_dir)
+    file_path = os.path.join(output_dir, file_title)
     columns = ["train_accuracy", "train_error", "accuracy", "error", "L1_norm", "L2_norm",
                "node_amount", "epoch_time", "total_time", "weight_active_ratio"]
-    file_title = "{0}_{1:%m%d%H%M}.csv".format(title, exec_time)
-    file_path = os.path.join(DATA_DIR, file_title)
     with open(file_path, 'w', newline="") as f:
         writer = csv.writer(f)
         writer.writerow(columns)
@@ -214,14 +217,47 @@ def make_csv(information_dict: dict):
 
 if __name__ == "__main__":
 
-    data_set = MNIST
-    if data_set[DataSet] == "MNIST":
-        data_tuple = read_mnist()
-    elif data_set[DataSet] == "CIFAR10":
-        data_tuple = read_cifar10()
-    else:
-        print("wrong dataset")
-        sys.exit()
-    for _ in range(10):
-        main(NetWork(hidden_layer=2, in_dim=data_set[DataLength], activation=ReLU, optimizer=SGD,
-                     md1=50, md2=100, out_dim=CLASS_NUM, dynamic=False, propose=False), data_tuple)
+    for data_set in [MNIST, CIFAR10]:
+        if data_set[DataSet] == "MNIST":
+            data_tuple = read_mnist()
+        elif data_set[DataSet] == "CIFAR10":
+            data_tuple = read_cifar10()
+        else:
+            print("wrong dataset")
+            sys.exit()
+        for _ in range(100):
+            main(NetWork(hidden_layer=2, in_dim=data_set[DataLength], activation=ReLU, optimizer=SGD,
+                         md1=500, md2=1000, out_dim=CLASS_NUM, dynamic=True, propose=True), data_tuple)
+            main(NetWork(hidden_layer=2, in_dim=data_set[DataLength], activation=ReLU, optimizer=SGD,
+                         md1=500, md2=1000, out_dim=CLASS_NUM, dynamic=True, propose=False), data_tuple)
+            main(NetWork(hidden_layer=2, in_dim=data_set[DataLength], activation=ReLU, optimizer=SGD,
+                         md1=500, md2=1000, out_dim=CLASS_NUM, dynamic=False, propose=True), data_tuple)
+            main(NetWork(hidden_layer=2, in_dim=data_set[DataLength], activation=ReLU, optimizer=SGD,
+                         md1=500, md2=1000, out_dim=CLASS_NUM, dynamic=False, propose=False), data_tuple)
+
+            main(NetWork(hidden_layer=2, in_dim=data_set[DataLength], activation=SIGMOID, optimizer=SGD,
+                         md1=500, md2=1000, out_dim=CLASS_NUM, dynamic=True, propose=True), data_tuple)
+            main(NetWork(hidden_layer=2, in_dim=data_set[DataLength], activation=SIGMOID, optimizer=SGD,
+                         md1=500, md2=1000, out_dim=CLASS_NUM, dynamic=True, propose=False), data_tuple)
+            main(NetWork(hidden_layer=2, in_dim=data_set[DataLength], activation=SIGMOID, optimizer=SGD,
+                         md1=500, md2=1000, out_dim=CLASS_NUM, dynamic=False, propose=True), data_tuple)
+            main(NetWork(hidden_layer=2, in_dim=data_set[DataLength], activation=SIGMOID, optimizer=SGD,
+                         md1=500, md2=1000, out_dim=CLASS_NUM, dynamic=False, propose=False), data_tuple)
+
+            main(NetWork(hidden_layer=2, in_dim=data_set[DataLength], activation=ReLU, optimizer=Adam,
+                         md1=500, md2=1000, out_dim=CLASS_NUM, dynamic=True, propose=True), data_tuple)
+            main(NetWork(hidden_layer=2, in_dim=data_set[DataLength], activation=ReLU, optimizer=Adam,
+                         md1=500, md2=1000, out_dim=CLASS_NUM, dynamic=True, propose=False), data_tuple)
+            main(NetWork(hidden_layer=2, in_dim=data_set[DataLength], activation=ReLU, optimizer=Adam,
+                         md1=500, md2=1000, out_dim=CLASS_NUM, dynamic=False, propose=True), data_tuple)
+            main(NetWork(hidden_layer=2, in_dim=data_set[DataLength], activation=ReLU, optimizer=Adam,
+                         md1=500, md2=1000, out_dim=CLASS_NUM, dynamic=False, propose=False), data_tuple)
+
+            main(NetWork(hidden_layer=2, in_dim=data_set[DataLength], activation=SIGMOID, optimizer=Adam,
+                         md1=500, md2=1000, out_dim=CLASS_NUM, dynamic=True, propose=True), data_tuple)
+            main(NetWork(hidden_layer=2, in_dim=data_set[DataLength], activation=SIGMOID, optimizer=Adam,
+                         md1=500, md2=1000, out_dim=CLASS_NUM, dynamic=True, propose=False), data_tuple)
+            main(NetWork(hidden_layer=2, in_dim=data_set[DataLength], activation=SIGMOID, optimizer=Adam,
+                         md1=500, md2=1000, out_dim=CLASS_NUM, dynamic=False, propose=True), data_tuple)
+            main(NetWork(hidden_layer=2, in_dim=data_set[DataLength], activation=SIGMOID, optimizer=Adam,
+                         md1=500, md2=1000, out_dim=CLASS_NUM, dynamic=False, propose=False), data_tuple)
