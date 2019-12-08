@@ -12,110 +12,46 @@ import sys
 import datetime
 
 
-def main(data_set):
-    exec_time = datetime.datetime.now()
-    models = []
-    # read_data
-    time1 = time.time()
-    if data_set[DataSet] == "MNIST":
-        train_data, train_label, test_data, test_label = read_mnist()
-    elif data_set[DataSet] == "CIFAR10":
-        train_data, train_label, test_data, test_label = read_cifar10()
-    else:
-        print("wrong dataset")
-        sys.exit()
-    models.append(NetWork(2, data_set[DataLength], ReLU, SGD, 500, 1000, CLASS_NUM))
-    time2 = time.time()
-    # print("format_complete time:{0}".format(time2 - time1))
-    for model in models:
-        weight_active_percent = []
-        latest_epoch = 0
-        time2 = time.time()
-        c = 0
-        train_accuracy = []
-        train_error = []
-        accuracy = []
-        err = []
-        l1_norm = []
-        l2_norm = []
-        node_amount = []
-        start = 0
-        is_proved = True
-        while is_proved:
-            while not early_stopping(err, start):
-                time3 = time.time()
-                print("epoch{0} train_start".format(c))
-                data, label = shuffle_data(train_data[:SAMPLE_SIZE], train_label[:SAMPLE_SIZE])
-                # data, label = shuffle_data(train_data, train_label)
-                data, label = transform_data(data, label)
-                train_info = model.training(data, label)
-                train_accuracy.append(train_info[0])
-                train_error.append(train_info[1])
-                time4 = time.time()
-                print("train_end, time:{}".format(time4 - time3))
-                test_info = model.test(test_data[:VALIDATION_DATA], test_label[:VALIDATION_DATA])
-                time5 = time.time()
-                print("test_end, time:{0}".format(time5 - time4))
-                print("error_average:{0}, accuracy:{1}%".format(test_info[1], int(test_info[0] * 100)))
-                print("l1_norm:{0}, l2_norm:{1}, node_amount{2}".format(test_info[2], test_info[3], test_info[4]))
-                accuracy.append(test_info[0])
-                err.append(test_info[1])
-                weight_active_percent.append(train_info[2])
-                l1_norm.append(test_info[2])
-                l2_norm.append(test_info[3])
-                node_amount.append(test_info[4])
-                latest_epoch = model.propose_method(accuracy, latest_epoch)
-                c += 1
-                # plot_fig(accuracy, err, l1_norm, l2_norm, node_amount, c, model)
-            # print("early_stopping, epochs: {0}".format(c-start))
-            if model.is_proved(accuracy):
-                model.add_layer()
-                print("add_layer")
-                start = c
-            else:
-                is_proved = False
-        # additional leaning
+def main(model, dataset):
+    (train_data, train_label, test_data, test_label) = dataset
+    latest_epoch = 0
+    c = 0
+    training_information_dict = \
+        {"train_accuracy": [], "train_error": [], "accuracy": [], "error": [], "l1_norm": [], "l2_norm": [],
+         "node_amount": [], "epoch_time": [], "total_time": [], "weight_active_ratio": []}
+    start = 0
+    is_proved = True
+    while is_proved:
+        while not early_stopping(training_information_dict["error"], start):
+            print("{0}epoch train_start".format(c))
+            train_info = train_epoch(model, train_data, train_label)
+            test_info = model.test(test_data[:VALIDATION_DATA], test_label[:VALIDATION_DATA])
+            training_information_dict = save_info(train_info, test_info, training_information_dict)
+            latest_epoch = model.propose_method(training_information_dict["accuracy"], latest_epoch)
+            print("error_average:{0}, accuracy:{1}%".format(test_info[1], int(test_info[0] * 100)))
+            print("l1_norm:{0}, l2_norm:{1}, node_amount{2}".format(test_info[2], test_info[3], test_info[4]))
+            c += 1
+        if model.is_proved(training_information_dict["accuracy"]):
+            model.add_layer()
+            print("add_layer")
+            start = c
+        else:
+            is_proved = False
+    # additional leaning
+    if model.is_dynamic:
         model.rollback_layer()
-        print("decision layer num, start additional learning")
         for i in range(10):
-            data, label = shuffle_data(train_data[:SAMPLE_SIZE], train_label[:SAMPLE_SIZE])
-            data, label = transform_data(data, label)
-            train_info = model.training(data, label, 2)
+            train_info = train_epoch(model, train_data, train_label, 2)
             test_info = model.test(test_data[:VALIDATION_DATA], test_label[:VALIDATION_DATA])
-            train_accuracy.append(train_info[0])
-            train_error.append(train_info[1])
-            weight_active_percent.append(train_info[2])
-            accuracy.append(test_info[0])
-            err.append(test_info[1])
-            l1_norm.append(test_info[2])
-            l2_norm.append(test_info[3])
-            node_amount.append(test_info[4])
+            training_information_dict = save_info(train_info, test_info, training_information_dict)
             c += 1
         for i in range(10):
-            data, label = shuffle_data(train_data[:SAMPLE_SIZE], train_label[:SAMPLE_SIZE])
-            data, label = transform_data(data, label)
-            train_info = model.training(data, label, 1)
+            train_info = train_epoch(model, train_data, train_label, 1)
             test_info = model.test(test_data[:VALIDATION_DATA], test_label[:VALIDATION_DATA])
-            train_accuracy.append(train_info[0])
-            train_error.append(train_info[1])
-            weight_active_percent.append(train_info[2])
-            accuracy.append(test_info[0])
-            err.append(test_info[1])
-            l1_norm.append(test_info[2])
-            l2_norm.append(test_info[3])
-            node_amount.append(test_info[4])
+            training_information_dict = save_info(train_info, test_info, training_information_dict)
             c += 1
-
-        test_info = model.test(test_data[:VALIDATION_DATA], test_label[:VALIDATION_DATA])
-        time5 = time.time()
-        # print("\ntotal_train_time:{0}".format(time5 - time2))
-        # print("total_epoch:{0}".format(c))
-        print("latest accuracy:{0}%".format(int(test_info[0]*100)))
-        # print("latest error:{0}".format(test_info[1]))
-
-        make_csv(model, train_accuracy, train_error,
-                 accuracy, err, l1_norm, node_amount, weight_active_percent)
-    print("total {0}min".format(int((time5 - time1)/60)))
+    print("train_end, total_time: {0}".format(training_information_dict["total_time"][-1]))
+    make_csv(training_information_dict)
 
 
 def read_cifar10() -> tuple:
@@ -212,6 +148,42 @@ def shuffle_data(data: np.array, label: list) -> tuple:
     return return_data, return_label
 
 
+def train_epoch(network, train_data, train_label, train_layer_num=None):
+    data, label = shuffle_data(train_data[:SAMPLE_SIZE], train_label[:SAMPLE_SIZE])
+    data, label = transform_data(data, label)
+    start = time.time()
+    if not train_layer_num:
+        accuracy, error, weight_active_ratio = network.training(data, label)
+    else:
+        accuracy, error, weight_active_ratio = network.training(data, label, train_layer_num)
+    end = time.time()
+    return end - start, accuracy, error, weight_active_ratio
+
+
+def save_info(train_info, test_info, training_information_dict):
+    """
+    dict have...
+    "train_accuracy": [], "train_error": [], "accuracy": [], "error": [], "l1_norm": [],
+    "l2_norm": [], "node_amount": [], "epoch_time": [], "total_time": [], "weight_active_ratio" :[]
+    train info have...
+    (epoch_time, train_accuracy, train_error, weight_active_ratio)
+    test_info have...
+    (accuracy, error, l1_norm, l2_norm, node_amount)
+    """
+    return_dict = copy.deepcopy(training_information_dict)
+    return_dict["epoch_time"].append(train_info[0])
+    return_dict["total_time"].append(sum(return_dict["epoch_time"]))
+    return_dict["train_accuracy"].append(train_info[1])
+    return_dict["train_error"].append(train_info[2])
+    return_dict["weight_active_ratio"].append(train_info[3])
+    return_dict["accuracy"].append(test_info[0])
+    return_dict["error"].append(test_info[1])
+    return_dict["l1_norm"].append(test_info[2])
+    return_dict["l2_norm"].append(test_info[3])
+    return_dict["node_amount"].append(test_info[4])
+    return return_dict
+
+
 def early_stopping(err: list, start) -> bool:
     if len(err) == start:
         return False
@@ -221,33 +193,35 @@ def early_stopping(err: list, start) -> bool:
     return True
 
 
-def make_csv(model, train_accuracy, train_error, accuracy, error, l1_norm, node_amount, weights):
+def make_csv(information_dict: dict):
     """
     学習時の情報をCSV化するメソッド e.g. "MNIST_500-1000_Adam_Sigmoid_11251759.csv"
-    :param model: 学習したネットワーク
-    :param train_accuracy: 訓練時の正答率
-    :param train_error: 訓練時の誤差関数地
-    :param accuracy: 精度 list
-    :param error: 誤差関数値 list
-    :param l1_norm: 重みの絶対値和 list
-    :param node_amount: ノード数 list
-    :param weights: 重みのアクティブ率
+    :param information_dict: 出力したい全ての情報が入った辞書
     :return: None
     """
     exec_time = datetime.datetime.now()
     title = ""
-    columns = ["train_accuracy", "train_error", "accuracy", "error", "L1_norm", "node_amount", "node_active_percent"]
+    columns = ["train_accuracy", "train_error", "accuracy", "error", "L1_norm", "L2_norm",
+               "node_amount", "epoch_time", "total_time", "weight_active_ratio"]
     file_title = "{0}_{1:%m%d%H%M}.csv".format(title, exec_time)
     file_path = os.path.join(DATA_DIR, file_title)
     with open(file_path, 'w', newline="") as f:
         writer = csv.writer(f)
         writer.writerow(columns)
-        for data in zip(train_accuracy, train_error, accuracy, error, l1_norm, node_amount, weights):
+        for data in zip(*information_dict.values()):
             writer.writerow(data)
 
 
 if __name__ == "__main__":
-    print("IMPORTANT!")
+
+    data_set = MNIST
+    if data_set[DataSet] == "MNIST":
+        data_tuple = read_mnist()
+    elif data_set[DataSet] == "CIFAR10":
+        data_tuple = read_cifar10()
+    else:
+        print("wrong dataset")
+        sys.exit()
     for _ in range(10):
-        # main(CIFAR10)
-        main(MNIST)
+        main(NetWork(hidden_layer=2, in_dim=data_set[DataLength], activation=ReLU, optimizer=SGD,
+                     md1=50, md2=100, out_dim=CLASS_NUM, dynamic=False, propose=False), data_tuple)

@@ -10,6 +10,7 @@ DataLength = 3
 DataAmount = 4
 TestAmount = 5
 DATA_DIR = os.path.join(os.getcwd(), "data")
+OUTPUT_DIR = os.path.join(DATA_DIR, "output")
 # DATA_DIR = 'C:\\Users\\tamtam\\PycharmProjects\\untitled\\src\\data'
 
 MNIST = {

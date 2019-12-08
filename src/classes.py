@@ -7,6 +7,8 @@ import time
 
 
 class Sgd:
+    name = "SGD"
+
     def optimize(self, weight, grad):
         return weight - (ETA * grad)
 
@@ -15,6 +17,8 @@ class Sgd:
 
 
 class MomentumSgd(Sgd):
+    name = "Momentum_SGD"
+
     def __init__(self):
         self.moment = 0
 
@@ -28,6 +32,8 @@ class MomentumSgd(Sgd):
 
 
 class Adam(Sgd):
+    name = "Adam"
+
     def __init__(self):
         self.mt = 0
         self.vt = 0
@@ -222,10 +228,12 @@ class SoftMaxLayer(Layer):
 
 class NetWork:
     def __init__(self, hidden_layer: int, in_dim: int, activation: int,
-                 optimizer: int, md1: int, md2: int, out_dim: int):
+                 optimizer: int, md1: int, md2: int, out_dim: int, dynamic=True, propose=True):
         self.hidden_layer = hidden_layer
         self.activation = activation
         self.layers = []
+        self.is_dynamic = dynamic
+        self.is_propose = propose
         self.layer_dims = [in_dim, md1, md2, out_dim]
 
         # set layers
@@ -327,6 +335,8 @@ class NetWork:
         """
         重み情報を保存し層を追加して重みの初期化をする
         """
+        if not self.is_dynamic:
+            return None
         self.previous_info["weights"] = copy.deepcopy(self.weights)
         self.previous_info["layers"] = copy.deepcopy(self.layers)
         self.previous_info["layer_dims"] = copy.deepcopy(self.layer_dims)
@@ -349,6 +359,8 @@ class NetWork:
             self.layer_dims.append(l.node_amount)
 
     def rollback_layer(self):
+        if not self.is_dynamic:
+            return None
         self.layers = self.previous_info["layers"]
         self.layer_dims = self.previous_info["layer_dims"]
         self.weights = self.previous_info["weights"]
@@ -407,6 +419,8 @@ class NetWork:
         2: 最後にスパース化してから、する前の性能以上の性能が出た場合： さらにスパース化する
         3: 性能向上が頭打ちになって、スパース化する前の性能を下回りそうな場合： ロールバックしてレートを落とす
         """
+        if not self.is_propose:
+            return 0
         input_layer = self.layers[0]
 
         # operation_1 スパース化してからの最高の性能が出てから一定エポックが経過していない
@@ -446,6 +460,8 @@ class NetWork:
         return len(accuracy_list) - 1
 
     def weight_active_percent(self):
+        if not self.is_propose:
+            return 1
         all_weight_amount = 0
         active_weight_amount = 0
         for w in self.weights:
