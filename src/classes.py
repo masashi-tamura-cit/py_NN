@@ -114,9 +114,16 @@ class Layer:
         self.activated_values = np.vstack((self.activated_values.T, np.ones(batch_size))).T
 
     def calc_net_values(self):
-        self.lag_weights.lag_layer.net_values \
-            = np.dot(self.activated_values, (self.lag_weights.weight * self.lag_weights.active_set)) *\
-            self.lag_weights.lag_layer.active_set + EPS
+        try:
+            self.lag_weights.lag_layer.net_values \
+                = np.dot(self.activated_values, (self.lag_weights.weight * self.lag_weights.active_set)) *\
+                self.lag_weights.lag_layer.active_set + EPS
+        except ValueError:
+            print(self.activated_values.shape)
+            print(self.lag_weights.weight.shape)
+            print(self.lag_weights.active_set.shape)
+            print(self.lag_weights.lag_layer.active_set.shape)
+            sys.exit(1)
 
     def calc_delta(self, labels: list):
         norm_diff = (1/(BATCH_SIZE * self.sd))*(BATCH_SIZE - (self.net_values ** 2) - 1)
@@ -181,7 +188,7 @@ class Layer:
                     self.lead_weights.optimizer.moment = np.delete(self.lead_weights.optimizer.moment, i - c, axis=1)
                     self.lag_weights.optimizer.moment = np.delete(self.lag_weights.optimizer.moment, i - c, axis=0)
         self.node_amount = int(round(np.sum(self.active_set)/np.max(self.active_set.flat)))
-        print(self.node_amount)
+        self.active_set = np.ones(self.node_amount)
         return self.node_amount
 
 
@@ -319,7 +326,7 @@ class NetWork:
             # input_data_to_input_layer
             self.layers[0].net_values = np.array(item)
             # forward operation
-            for layer in self.layers:
+            for layer, i in zip(self.layers, range(len(self.layers))):
                 layer.normalize()
                 layer.activate()
                 layer.calc_net_values()
@@ -441,7 +448,7 @@ class NetWork:
         ノードと重みのスパース推定を行う
         入力から3つのオペレーションを行う
         １: 最後にスパース化してからまだ性能が向上しそうな場合：　何も処理せずにlatest_epochを返す
-        2: 最後にスパース化してから、する前の性能以上の性能が出た場合： さらにスパース化する
+        2: 最後にスパース化してから、する前の性能以上の性能が出た場合： そのままさらにスパース化する
         3: 性能向上が頭打ちになって、スパース化する前の性能を下回りそうな場合： ロールバックしてレートを落とす
         """
         if not self.is_propose:
@@ -456,7 +463,6 @@ class NetWork:
         # 性能が低下したと認められる場合、ロールバックしてレートを落とす
         previous_accuracy = accuracy_list[:latest_epoch]
         if previous_accuracy and max(target) < max(previous_accuracy):
-            print("rollback")
             # if len(self.layers) == 4:
             #    input_layer.active_set = np.ones(input_layer.node_amount)
             #    self.deactivate_ratio["input_node"]["ratio"] *= self.deactivate_ratio["input_node"]["alfa"]
@@ -468,7 +474,10 @@ class NetWork:
             for w in self.weights:
                 w.active_set = w.previous_active_set
                 self.deactivate_ratio["weight"]["ratio"] *= self.deactivate_ratio["weight"]["alfa"]
-
+        else:
+            for layer in self.layers[:-1]:
+                print(layer.node_amount)
+                print(layer.lag_weights.weight.shape)
         # スパース化
         # if len(self.layers) == 4:
         #    node_amount =  input_layer.delete_node(None)

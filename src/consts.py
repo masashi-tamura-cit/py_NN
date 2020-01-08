@@ -10,8 +10,6 @@ DataLength = 3
 DataAmount = 4
 TestAmount = 5
 DATA_DIR = os.path.join(os.getcwd(), "data")
-OUTPUT_DIR = os.path.join(DATA_DIR, "output")
-# DATA_DIR = 'C:\\Users\\tamtam\\PycharmProjects\\untitled\\src\\data'
 
 MNIST = {
     DataSet: "MNIST",
@@ -49,4 +47,6 @@ ALPHA = 0.01
 BETA1 = 0.9
 BETA2 = 0.999
 EPS = pow(10, -8)
-LAMBDA = 0.0  # for norm
+LAMBDA = 0  # for norm
+OUTPUT_BASE_DIR = os.path.join(DATA_DIR, "output")
+OUTPUT_DIR = os.path.join(OUTPUT_BASE_DIR, "output_lm{0}".format(LAMBDA).replace(".", ""))

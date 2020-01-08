@@ -23,17 +23,13 @@ def main(model, dataset):
     is_proved = True
     while is_proved:
         while not early_stopping(training_information_dict["error"], start):
-            print("{0}epoch train_start".format(c))
             train_info = train_epoch(model, train_data, train_label)
             test_info = model.test(test_data[:VALIDATION_DATA], test_label[:VALIDATION_DATA])
             training_information_dict = save_info(train_info, test_info, training_information_dict)
             latest_epoch = model.propose_method(training_information_dict["accuracy"], latest_epoch)
-            print("error_average:{0}, accuracy:{1}%".format(test_info[1], int(test_info[0] * 100)))
-            print("l1_norm:{0}, l2_norm:{1}, node_amount{2}".format(test_info[2], test_info[3], test_info[4]))
             c += 1
         if model.is_proved(training_information_dict["accuracy"]):
             model.add_layer()
-            print("add_layer")
             start = c
         else:
             is_proved = False
@@ -200,6 +196,8 @@ def make_csv(information_dict: dict, dir_name: str):
     :param dir_name: ディレクトリ名 なければ新たに生成する
     :return: None
     """
+    if not os.path.exists(OUTPUT_DIR):
+        os.mkdir(OUTPUT_DIR)
     exec_time = datetime.datetime.now()
     file_title = "{0:%m%d%H%M}.csv".format(exec_time)
     output_dir = os.path.join(OUTPUT_DIR, dir_name)
@@ -216,7 +214,6 @@ def make_csv(information_dict: dict, dir_name: str):
 
 
 if __name__ == "__main__":
-
     for data_set in [MNIST, CIFAR10]:
         if data_set[DataSet] == "MNIST":
             data_tuple = read_mnist()
@@ -244,20 +241,20 @@ if __name__ == "__main__":
             main(NetWork(hidden_layer=2, in_dim=data_set[DataLength], activation=SIGMOID, optimizer=SGD,
                          md1=500, md2=1000, out_dim=CLASS_NUM, dynamic=False, propose=False), data_tuple)
 
-            main(NetWork(hidden_layer=2, in_dim=data_set[DataLength], activation=ReLU, optimizer=Adam,
+            main(NetWork(hidden_layer=2, in_dim=data_set[DataLength], activation=ReLU, optimizer=ADAM,
                          md1=500, md2=1000, out_dim=CLASS_NUM, dynamic=True, propose=True), data_tuple)
-            main(NetWork(hidden_layer=2, in_dim=data_set[DataLength], activation=ReLU, optimizer=Adam,
+            main(NetWork(hidden_layer=2, in_dim=data_set[DataLength], activation=ReLU, optimizer=ADAM,
                          md1=500, md2=1000, out_dim=CLASS_NUM, dynamic=True, propose=False), data_tuple)
-            main(NetWork(hidden_layer=2, in_dim=data_set[DataLength], activation=ReLU, optimizer=Adam,
+            main(NetWork(hidden_layer=2, in_dim=data_set[DataLength], activation=ReLU, optimizer=ADAM,
                          md1=500, md2=1000, out_dim=CLASS_NUM, dynamic=False, propose=True), data_tuple)
-            main(NetWork(hidden_layer=2, in_dim=data_set[DataLength], activation=ReLU, optimizer=Adam,
+            main(NetWork(hidden_layer=2, in_dim=data_set[DataLength], activation=ReLU, optimizer=ADAM,
                          md1=500, md2=1000, out_dim=CLASS_NUM, dynamic=False, propose=False), data_tuple)
 
-            main(NetWork(hidden_layer=2, in_dim=data_set[DataLength], activation=SIGMOID, optimizer=Adam,
+            main(NetWork(hidden_layer=2, in_dim=data_set[DataLength], activation=SIGMOID, optimizer=ADAM,
                          md1=500, md2=1000, out_dim=CLASS_NUM, dynamic=True, propose=True), data_tuple)
-            main(NetWork(hidden_layer=2, in_dim=data_set[DataLength], activation=SIGMOID, optimizer=Adam,
+            main(NetWork(hidden_layer=2, in_dim=data_set[DataLength], activation=SIGMOID, optimizer=ADAM,
                          md1=500, md2=1000, out_dim=CLASS_NUM, dynamic=True, propose=False), data_tuple)
-            main(NetWork(hidden_layer=2, in_dim=data_set[DataLength], activation=SIGMOID, optimizer=Adam,
+            main(NetWork(hidden_layer=2, in_dim=data_set[DataLength], activation=SIGMOID, optimizer=ADAM,
                          md1=500, md2=1000, out_dim=CLASS_NUM, dynamic=False, propose=True), data_tuple)
-            main(NetWork(hidden_layer=2, in_dim=data_set[DataLength], activation=SIGMOID, optimizer=Adam,
+            main(NetWork(hidden_layer=2, in_dim=data_set[DataLength], activation=SIGMOID, optimizer=ADAM,
                          md1=500, md2=1000, out_dim=CLASS_NUM, dynamic=False, propose=False), data_tuple)
