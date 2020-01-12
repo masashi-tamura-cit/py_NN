@@ -3,7 +3,6 @@ import numpy as np
 import math
 import copy
 import sys
-import time
 
 
 class Sgd:
@@ -40,8 +39,8 @@ class Adam(Sgd):
         self.__t = 1
 
     def optimize(self, weight, grad):
-        self.mt = BETA1 * self.mt + ((1 - BETA1) * grad)
-        self.vt = BETA2 * self.vt + ((1 - BETA2) * np.power(grad, 2))
+        self.mt = (BETA1 * self.mt) + ((1 - BETA1) * grad)
+        self.vt = (BETA2 * self.vt) + ((1 - BETA2) * np.power(grad, 2))
         m = self.mt/(1 - pow(BETA1, self.__t))
         v = self.vt/(1 - pow(BETA2, self.__t))
         self.__t += 1
@@ -67,7 +66,6 @@ class Weights:
     def calc_grad(self):
         if self.is_fixed:
             return None
-
         self.gradients = (np.dot(self.lag_layer.delta.T, self.lead_layer.activated_values).T +
                           (LAMBDA * np.sign(self.weight))) / BATCH_SIZE
 
@@ -107,6 +105,7 @@ class Layer:
         self.sd = np.sqrt(np.var(self.net_values, axis=0) + EPS)
         ave = np.average(self.net_values, axis=0)
         self.net_values = (self.net_values - ave) / self.sd
+        self.net_values -= EPS
 
     def activate(self):
         batch_size = self.net_values.shape[0]
@@ -479,10 +478,6 @@ class NetWork:
                 print(layer.node_amount)
                 print(layer.lag_weights.weight.shape)
         # スパース化
-        # if len(self.layers) == 4:
-        #    node_amount =  input_layer.delete_node(None)
-        #    self.layer_dims[1] = node_amount
-        #    input_layer.make_active_set(self.deactivate_ratio["input_node"]["ratio"])
         for i, l in enumerate(self.layers[-3:-1]):
             if not l.lead_weights is None:
                 node_amount = l.delete_node(self.optimizer)

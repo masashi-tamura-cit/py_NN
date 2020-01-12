@@ -39,14 +39,14 @@ ADAM = 2
 DATASET = MNIST
 BATCH_SIZE = 32
 SAMPLE_SIZE = 6400
-VALIDATION_DATA = 100
+VALIDATION_DATA = 10000
 EARLY_STOPPING_EPOCH = 30
 # optimizer params
-ETA = 0.001
+ETA = 0.01
 ALPHA = 0.01
 BETA1 = 0.9
 BETA2 = 0.999
 EPS = pow(10, -8)
 LAMBDA = 0  # for norm
 OUTPUT_BASE_DIR = os.path.join(DATA_DIR, "output")
-OUTPUT_DIR = os.path.join(OUTPUT_BASE_DIR, "output_lm{0}".format(LAMBDA).replace(".", ""))
+OUTPUT_DIR = os.path.join(OUTPUT_BASE_DIR, f"lm_{LAMBDA}")
