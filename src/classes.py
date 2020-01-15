@@ -44,7 +44,7 @@ class Adam(Sgd):
         m = self.mt/(1 - pow(BETA1, self.__t))
         v = self.vt/(1 - pow(BETA2, self.__t))
         self.__t += 1
-        return weight - ALPHA * (m / (np.sqrt(v) + EPS))
+        return weight - ETA * (m / (np.sqrt(v) + EPS))
 
     def reset(self):
         self.mt = 0
@@ -98,14 +98,22 @@ class Layer:
         self.lag_weights = None
         self.delta = np.array([])
         self.test_nodes = np.array([])
-        self.sd = []
+        self.var = []
         self.active_set = np.ones(amount)
+        self.ave_ave = np.zeros(amount)
+        self.var_ave = np.zeros(amount)
+        self.gamma = np.ones(amount)
+        self.beta = np.zeros(amount)
 
     def normalize(self):
-        self.sd = np.sqrt(np.var(self.net_values, axis=0) + EPS)
+        self.var = np.var(self.net_values, axis=0)
         ave = np.average(self.net_values, axis=0)
-        self.net_values = (self.net_values - ave) / self.sd
-        self.net_values -= EPS
+        self.net_values = self.gamma * ((self.net_values - ave) / np.sqrt(self.var + EPS)) + self.beta
+        self.ave_ave = (MOMENTUM * self.ave_ave) + ((1 - MOMENTUM) * ave)
+        self.var_ave = (MOMENTUM * self.var_ave) + ((1 - MOMENTUM) * self.var)
+
+    def test_normalize(self):
+        self.net_values = self.gamma * ((self.net_values - self.ave_ave) / np.sqrt(self.var_ave + EPS)) + self.beta
 
     def activate(self):
         batch_size = self.net_values.shape[0]
@@ -113,21 +121,23 @@ class Layer:
         self.activated_values = np.vstack((self.activated_values.T, np.ones(batch_size))).T
 
     def calc_net_values(self):
-        try:
-            self.lag_weights.lag_layer.net_values \
-                = np.dot(self.activated_values, (self.lag_weights.weight * self.lag_weights.active_set)) *\
-                self.lag_weights.lag_layer.active_set + EPS
-        except ValueError:
-            print(self.activated_values.shape)
-            print(self.lag_weights.weight.shape)
-            print(self.lag_weights.active_set.shape)
-            print(self.lag_weights.lag_layer.active_set.shape)
-            sys.exit(1)
+        self.lag_weights.lag_layer.net_values \
+            = np.dot(self.activated_values, (self.lag_weights.weight * self.lag_weights.active_set)) *\
+            self.lag_weights.lag_layer.active_set + EPS
 
     def calc_delta(self, labels: list):
-        norm_diff = (1/(BATCH_SIZE * self.sd))*(BATCH_SIZE - (self.net_values ** 2) - 1)
-        round_z = self.lag_weights.lag_layer.delta.dot(self.lag_weights.weight[:-1].T) * norm_diff
-        self.delta = round_z * (self.net_values * (self.net_values > 0)) / self.net_values
+        round_z = self.lag_weights.lag_layer.delta.dot(self.lag_weights.weight[:-1].T)
+        round_net = ((self.net_values * (self.net_values > 0)) / self.net_values) * round_z
+        x_hat = (self.net_values - self.beta) / self.gamma
+        delta_gamma = np.sum(round_net * x_hat, axis=0)
+        delta_beta = np.sum(round_net, axis=0)
+        self.delta = (self.gamma/(np.sqrt(self.var + EPS))) * \
+                     (round_net - (1 / BATCH_SIZE) *
+                      (delta_beta + (x_hat * delta_gamma)))
+
+        # SGD gamma and beta
+        self.gamma = self.gamma - (ETA * delta_gamma / BATCH_SIZE)
+        self.beta = self.beta - (ETA * delta_beta / BATCH_SIZE)
 
     def make_active_set(self, ratio):
         """
@@ -199,20 +209,21 @@ class SigmoidLayer(Layer):
         self.activated_values = np.vstack((self.activated_values.T, np.ones(batch_size))).T
 
     def calc_delta(self, labels: list):
-        norm_diff = (1/(BATCH_SIZE * self.sd))*(BATCH_SIZE - (self.net_values ** 2) - 1)
-        round_z = np.dot(self.lag_weights.lag_layer.delta, self.lag_weights.weight[:-1].T)
-        self.delta = round_z * (1 - self.activated_values.T[:-1].T) * self.activated_values.T[:-1].T * norm_diff
+        round_z = self.lag_weights.lag_layer.delta.dot(self.lag_weights.weight[:-1].T)
+        round_net = (1 - self.activated_values.T[:-1].T) * round_z
+        x_hat = (self.net_values - self.beta) / self.gamma
+        delta_gamma = np.sum(round_net * x_hat, axis=0)
+        delta_beta = np.sum(round_net, axis=0)
+        self.delta = (self.gamma/(np.sqrt(self.var + EPS))) * \
+                     (round_net - (1 / BATCH_SIZE) *
+                      (delta_beta + (x_hat * delta_gamma)))
+
+        # SGD gamma and beta
+        self.gamma = self.gamma - (ETA * delta_gamma)
+        self.beta = self.beta - (ETA * delta_beta)
 
 
 class SoftMaxLayer(Layer):
-    def normalize(self):
-        sd = []
-        ave = []
-        for v in self.net_values.T:
-            sd.append(float(np.sqrt(np.var(v) + 0.0001)))  # avoid 0 divide
-            ave.append(float(np.average(v)))
-        self.sd = np.array(sd)
-        self.net_values = (self.net_values - np.array(ave)) / self.sd
 
     def activate(self):
         value_arr = []
@@ -222,11 +233,19 @@ class SoftMaxLayer(Layer):
         self.activated_values = np.array(value_arr)
 
     def calc_delta(self, labels: list) -> np.array:
-        norm_diff = (1/(BATCH_SIZE * self.sd))*(BATCH_SIZE - pow(self.net_values, 2) - 1)
-        delta_arr = copy.deepcopy(self.activated_values)
-        for i, delta in zip(labels, delta_arr):
+        round_net = copy.deepcopy(self.activated_values)
+        for i, delta in zip(labels, round_net):
             delta[i] = delta[i] - 1
-        self.delta = np.array(delta_arr) * norm_diff
+        x_hat = (self.net_values - self.beta) / self.gamma
+        delta_gamma = np.sum(round_net * x_hat, axis=0)
+        delta_beta = np.sum(round_net, axis=0)
+        self.delta = (self.gamma/(np.sqrt(self.var + EPS))) * \
+                     (round_net - (1 / BATCH_SIZE) *
+                      (delta_beta + (x_hat * delta_gamma)))
+
+        # SGD gamma and beta
+        self.gamma = self.gamma - (ETA * delta_gamma)
+        self.beta = self.beta - (ETA * delta_beta)
 
     def calc_net_values(self):
         pass
@@ -343,7 +362,7 @@ class NetWork:
         self.layers[0].net_values = test_data
         data_amount = len(test_labels)
         for layer in self.layers:
-            layer.normalize()
+            layer.test_normalize()
             layer.activate()
             layer.calc_net_values()
         accuracy = self.calc_correct_num(test_labels) / data_amount
@@ -427,7 +446,7 @@ class NetWork:
         """
         error = 0
         for value, key in zip(self.layers[-1].activated_values, label):
-            error += -math.log(value[key], np.e)
+            error += -math.log(value[key]+EPS, np.e)
         return error
 
     def calc_correct_num(self, label: list) -> int:
@@ -485,7 +504,6 @@ class NetWork:
                 l.make_active_set(self.deactivate_ratio["node"]["ratio"])
         for w in self.weights:
             w.make_active_set(self.deactivate_ratio["weight"]["ratio"])
-
         return len(accuracy_list) - 1
 
     def weight_active_percent(self):

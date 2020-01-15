@@ -4,8 +4,6 @@ from consts import *
 import time
 from classes import *
 import numpy as np
-from matplotlib import pyplot as plt
-from PIL import Image
 import math
 import random
 import sys
@@ -14,6 +12,13 @@ import datetime
 
 def main(model, dataset):
     (train_data, train_label, test_data, test_label) = dataset
+    train_data = train_data[:SAMPLE_SIZE]
+    train_label = train_label[:SAMPLE_SIZE]
+    # train_train or not
+    test_data = test_data[:VALIDATION_DATA]
+    test_label = test_label[:VALIDATION_DATA]
+    # test_data = train_data[:VALIDATION_DATA]
+    # test_label = train_label[:VALIDATION_DATA]
     latest_epoch = 0
     c = 0
     training_information_dict = \
@@ -24,7 +29,7 @@ def main(model, dataset):
     while is_proved:
         while not early_stopping(training_information_dict["error"], start):
             train_info = train_epoch(model, train_data, train_label)
-            test_info = model.test(test_data[:VALIDATION_DATA], test_label[:VALIDATION_DATA])
+            test_info = model.test(test_data, test_label)
             training_information_dict = save_info(train_info, test_info, training_information_dict)
             latest_epoch = model.propose_method(training_information_dict["accuracy"], latest_epoch)
             c += 1
@@ -38,12 +43,12 @@ def main(model, dataset):
         model.rollback_layer()
         for i in range(10):
             train_info = train_epoch(model, train_data, train_label, 2)
-            test_info = model.test(test_data[:VALIDATION_DATA], test_label[:VALIDATION_DATA])
+            test_info = model.test(test_data, test_label)
             training_information_dict = save_info(train_info, test_info, training_information_dict)
             c += 1
         for i in range(10):
             train_info = train_epoch(model, train_data, train_label, 1)
-            test_info = model.test(test_data[:VALIDATION_DATA], test_label[:VALIDATION_DATA])
+            test_info = model.test(test_data, test_label)
             training_information_dict = save_info(train_info, test_info, training_information_dict)
             c += 1
     print("train_end, total_time: {0}".format(training_information_dict["total_time"][-1]))
@@ -145,8 +150,7 @@ def shuffle_data(data: np.array, label: list) -> tuple:
 
 
 def train_epoch(network, train_data, train_label, train_layer_num=None):
-    data, label = shuffle_data(train_data[:SAMPLE_SIZE], train_label[:SAMPLE_SIZE])
-    data, label = transform_data(data, label)
+    data, label = transform_data(*shuffle_data(train_data, train_label))
     start = time.time()
     if not train_layer_num:
         accuracy, error, weight_active_ratio = network.training(data, label)
@@ -223,7 +227,8 @@ if __name__ == "__main__":
             print("wrong dataset")
             sys.exit()
         for _ in range(10):
-            main(NetWork(hidden_layer=2, in_dim=data_set[DataLength], activation=ReLU, optimizer=SGD,
+            """
+            main(NetWork(hidden_layer=2, in_dim=data_set[DataLength], activation=ReLU, optimizer=ADAM,
                          md1=50, md2=100, out_dim=CLASS_NUM, dynamic=False, propose=False), data_tuple)
             """
             main(NetWork(hidden_layer=2, in_dim=data_set[DataLength], activation=ReLU, optimizer=ADAM,
@@ -234,4 +239,3 @@ if __name__ == "__main__":
                          md1=500, md2=1000, out_dim=CLASS_NUM, dynamic=False, propose=True), data_tuple)
             main(NetWork(hidden_layer=2, in_dim=data_set[DataLength], activation=ReLU, optimizer=ADAM,
                          md1=500, md2=1000, out_dim=CLASS_NUM, dynamic=False, propose=False), data_tuple)
-            """
