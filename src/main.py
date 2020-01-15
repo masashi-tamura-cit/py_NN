@@ -231,11 +231,10 @@ if __name__ == "__main__":
             main(NetWork(hidden_layer=2, in_dim=data_set[DataLength], activation=ReLU, optimizer=ADAM,
                          md1=50, md2=100, out_dim=CLASS_NUM, dynamic=False, propose=False), data_tuple)
             """
+
             main(NetWork(hidden_layer=2, in_dim=data_set[DataLength], activation=ReLU, optimizer=ADAM,
-                         md1=500, md2=1000, out_dim=CLASS_NUM, dynamic=True, propose=True), data_tuple)
+                         md1=50, md2=100, out_dim=CLASS_NUM, dynamic=False, propose=False), data_tuple)
             main(NetWork(hidden_layer=2, in_dim=data_set[DataLength], activation=ReLU, optimizer=ADAM,
-                         md1=500, md2=1000, out_dim=CLASS_NUM, dynamic=True, propose=False), data_tuple)
+                         md1=50, md2=100, out_dim=CLASS_NUM, dynamic=True, propose=False), data_tuple)
             main(NetWork(hidden_layer=2, in_dim=data_set[DataLength], activation=ReLU, optimizer=ADAM,
-                         md1=500, md2=1000, out_dim=CLASS_NUM, dynamic=False, propose=True), data_tuple)
-            main(NetWork(hidden_layer=2, in_dim=data_set[DataLength], activation=ReLU, optimizer=ADAM,
-                         md1=500, md2=1000, out_dim=CLASS_NUM, dynamic=False, propose=False), data_tuple)
+                         md1=50, md2=100, out_dim=CLASS_NUM, dynamic=True, propose=True), data_tuple)

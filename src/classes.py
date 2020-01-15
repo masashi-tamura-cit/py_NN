@@ -180,6 +180,7 @@ class Layer:
         # net_value削除
         # lag_weightの該当列削除
         # lead_weightの該当行削除
+        # gamma, betaの削除
         c = 0
         for i in range(self.active_set.size):
             if self.active_set[i] == 0:
@@ -187,6 +188,10 @@ class Layer:
                 self.lead_weights.active_set = np.delete(self.lead_weights.active_set, i - c, axis=1)
                 self.lag_weights.weight = np.delete(self.lag_weights.weight, i - c, axis=0)
                 self.lag_weights.active_set = np.delete(self.lag_weights.active_set, i - c, axis=0)
+                self.gamma = np.delete(self.gamma, i-c)
+                self.beta = np.delete(self.beta, i-c)
+                self.ave_ave = np.delete(self.ave_ave, i-c)
+                self.var_ave = np.delete(self.var_ave, i-c)
                 c += 1
                 if isinstance(optimizer, Adam):
                     self.lead_weights.optimizer.mt = np.delete(self.lead_weights.optimizer.mt, i - c, axis=1)
