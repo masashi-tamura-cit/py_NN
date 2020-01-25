@@ -11,14 +11,13 @@ import datetime
 
 
 def main(model, dataset):
+    # kaggle 用なので、trainデータを分割して使って性能評価する
     (train_data, train_label, test_data, test_label) = dataset
     train_data = train_data[:SAMPLE_SIZE]
     train_label = train_label[:SAMPLE_SIZE]
     # train_train or not
-    test_data = test_data[:VALIDATION_DATA]
-    test_label = test_label[:VALIDATION_DATA]
-    # test_data = train_data[:VALIDATION_DATA]
-    # test_label = train_label[:VALIDATION_DATA]
+    test_data = train_data[SAMPLE_SIZE:]
+    test_label = train_label[SAMPLE_SIZE:]
     latest_epoch = 0
     c = 0
     training_information_dict = \
@@ -52,33 +51,7 @@ def main(model, dataset):
             training_information_dict = save_info(train_info, test_info, training_information_dict)
             c += 1
     print("train_end, total_time: {0}".format(training_information_dict["total_time"][-1]))
-    make_csv(training_information_dict, model.property_str)
-
-
-def read_cifar10() -> tuple:
-    """
-    CIFAR10のデータセットを読み込んで配列に格納する
-    データは1画像毎に分けるため2次元配列、ラベルは1次元
-    :return: train_data, train_label, test_data, test_label
-    """
-    bin_data = []
-    # read_train_data
-    for filename in CIFAR10[FileName][:-1]:
-        file_path = os.path.join(DATA_DIR, filename)
-        with open(file_path, "rb") as f:
-            bin_data.extend(f.read((CIFAR10[DataLength] + 1) * CIFAR10[DataAmount]))
-    data = np.array(bin_data).reshape(CIFAR10[DataAmount] * (len(CIFAR10[FileName]) - 1), (CIFAR10[DataLength] + 1))
-    train_data = data.T[1:].T
-    train_label = list(data.T[0])
-
-    # read_test_data
-    file_path = os.path.join(DATA_DIR, CIFAR10[FileName][-1])
-    with open(file_path, "rb") as f:
-        bin_data = list(f.read((CIFAR10[DataLength] + 1) * CIFAR10[TestAmount]))
-    data = np.array(bin_data).reshape(CIFAR10[TestAmount], CIFAR10[DataLength] + 1)
-    test_data = data.T[1:].T
-    test_label = list(data.T[0])
-    return train_data, train_label, test_data, test_label
+    return training_information_dict["accuracy"][-1]
 
 
 def read_mnist() -> tuple:
@@ -87,38 +60,13 @@ def read_mnist() -> tuple:
     データは1文字ごとに分けるため2次元配列、ラベルは1次元になる
     :return: train_data, train_label, test_data, test_labelのtuple
     """
-    file_path = os.path.join(DATA_DIR, MNIST[FileName][0])
-    # read_train_data
-    with open(file_path, "rb") as f:
-        f.read(16)  # header
-        bin_data = f.read(MNIST[DataLength] * MNIST[DataAmount])
-    train_data = []
-    for i in range(MNIST[DataAmount]):
-        train_data.append(list(bin_data[i * MNIST[DataLength]: (i + 1) * MNIST[DataLength]]))
-    file_path = os.path.join(DATA_DIR, MNIST[FileName][1])
-    # read_train_label
-    with open(file_path, "rb") as f:
-        f.read(8)  # header
-        bin_data = f.read(MNIST[DataAmount])
-    train_label = list(bin_data)
+    train_arr = np.array([i for i in csv.reader(open(os.path.join(DATA_DIR, MNIST[FileName][0])))][1:], dtype=int)
+    train_label = train_arr.T[0].tolist()
+    train_data = train_arr.T[1:].T.tolist()
 
-    file_path = os.path.join(DATA_DIR, MNIST[FileName][2])
-    # read_test_data
-    with open(file_path, "rb") as f:
-        f.read(16)  # header
-        bin_data = f.read(MNIST[DataLength] * MNIST[TestAmount])
-    test_data = []
-    for i in range(MNIST[TestAmount]):
-        test_data.append(list(bin_data[i * MNIST[DataLength]: (i + 1) * MNIST[DataLength]]))
+    test_data = [i for i in csv.reader(open(os.path.join(DATA_DIR, MNIST[FileName][1])))][1:]
 
-    file_path = os.path.join(DATA_DIR, MNIST[FileName][3])
-    # read_test_data
-    with open(file_path, "rb") as f:
-        f.read(8)  # header
-        bin_data = f.read(MNIST[TestAmount])
-    test_label = list(bin_data)
-    return np.array(train_data), train_label, np.array(test_data), test_label
-
+    return train_data, train_label, test_data, None
 
 def transform_data(train_data: np.array, train_label: np.array) -> tuple:
     """
@@ -193,48 +141,17 @@ def early_stopping(err: list, start) -> bool:
     return True
 
 
-def make_csv(information_dict: dict, dir_name: str):
-    """
-    学習時の情報をCSV化するメソッド e.g. "MNIST_500-1000_Adam_Sigmoid_11251759.csv"
-    :param information_dict: 出力したい全ての情報が入った辞書
-    :param dir_name: ディレクトリ名 なければ新たに生成する
-    :return: None
-    """
-    if not os.path.exists(OUTPUT_DIR):
-        os.mkdir(OUTPUT_DIR)
-    exec_time = datetime.datetime.now()
-    file_title = "{0:%m%d%H%M}.csv".format(exec_time)
-    output_dir = os.path.join(OUTPUT_DIR, dir_name)
-    if not os.path.exists(output_dir):
-        os.mkdir(output_dir)
-    file_path = os.path.join(output_dir, file_title)
-    columns = ["train_accuracy", "train_error", "accuracy", "error", "L1_norm", "L2_norm",
-               "node_amount", "epoch_time", "total_time", "weight_active_ratio"]
-    with open(file_path, 'w', newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow(columns)
-        for data in zip(*information_dict.values()):
-            writer.writerow(data)
-
-
 if __name__ == "__main__":
-    for data_set in [MNIST, CIFAR10]:
-        if data_set[DataSet] == "MNIST":
-            data_tuple = read_mnist()
-        elif data_set[DataSet] == "CIFAR10":
-            data_tuple = read_cifar10()
-        else:
-            print("wrong dataset")
-            sys.exit()
-        for _ in range(10):
-            """
-            main(NetWork(hidden_layer=2, in_dim=data_set[DataLength], activation=ReLU, optimizer=ADAM,
-                         md1=50, md2=100, out_dim=CLASS_NUM, dynamic=False, propose=False), data_tuple)
-            """
-
-            main(NetWork(hidden_layer=2, in_dim=data_set[DataLength], activation=ReLU, optimizer=ADAM,
-                         md1=50, md2=100, out_dim=CLASS_NUM, dynamic=False, propose=False), data_tuple)
-            main(NetWork(hidden_layer=2, in_dim=data_set[DataLength], activation=ReLU, optimizer=ADAM,
-                         md1=50, md2=100, out_dim=CLASS_NUM, dynamic=True, propose=False), data_tuple)
-            main(NetWork(hidden_layer=2, in_dim=data_set[DataLength], activation=ReLU, optimizer=ADAM,
-                         md1=50, md2=100, out_dim=CLASS_NUM, dynamic=True, propose=True), data_tuple)
+    data_tuple = read_mnist()
+    st = NetWork(hidden_layer=2, in_dim=MNIST[DataLength], activation=ReLU, optimizer=ADAM,
+                 md1=50, md2=100, out_dim=CLASS_NUM, dynamic=False, propose=False)
+    dy = NetWork(hidden_layer=2, in_dim=MNIST[DataLength], activation=ReLU, optimizer=ADAM,
+                 md1=50, md2=100, out_dim=CLASS_NUM, dynamic=True, propose=False)
+    pr = NetWork(hidden_layer=2, in_dim=MNIST[DataLength], activation=ReLU, optimizer=ADAM,
+                 md1=50, md2=100, out_dim=CLASS_NUM, dynamic=True, propose=True)
+    st_accuracy = main(st, data_tuple)
+    print(st_accuracy)
+    dy_accuracy = main(dy, data_tuple)
+    print(dy_accuracy)
+    pr_accuracy = main(pr, data_tuple)
+    print(pr_accuracy)
