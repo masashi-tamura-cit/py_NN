@@ -451,7 +451,7 @@ class NetWork:
         """
         error = 0
         for value, key in zip(self.layers[-1].activated_values, label):
-            error += -math.log(value[key]+EPS, np.e)
+            error -= math.log(value[key] + EPS, np.e)
         return error
 
     def calc_correct_num(self, label: list) -> int:

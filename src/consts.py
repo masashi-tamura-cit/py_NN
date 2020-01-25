@@ -19,6 +19,7 @@ MNIST = {
 }
 
 ReLU = 0
+SIGMOID = 1
 SGD = 0
 MOMENTUM_SGD = 1
 ADAM = 2

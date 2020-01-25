@@ -12,12 +12,14 @@ import datetime
 
 def main(model, dataset):
     # kaggle 用なので、trainデータを分割して使って性能評価する
-    (train_data, train_label, test_data, test_label) = dataset
-    train_data = train_data[:SAMPLE_SIZE]
-    train_label = train_label[:SAMPLE_SIZE]
+    (train_datas, train_labels, test_datas, test_labels) = dataset
+    train_data = train_datas[:SAMPLE_SIZE]
+    train_label = train_labels[:SAMPLE_SIZE]
     # train_train or not
-    test_data = train_data[SAMPLE_SIZE:]
-    test_label = train_label[SAMPLE_SIZE:]
+    test_data = train_datas[SAMPLE_SIZE:]
+    test_label = train_labels[SAMPLE_SIZE:]
+    print(len(test_label))
+    print(test_data.shape)
     latest_epoch = 0
     c = 0
     training_information_dict = \
@@ -62,7 +64,10 @@ def read_mnist() -> tuple:
     """
     train_arr = np.array([i for i in csv.reader(open(os.path.join(DATA_DIR, MNIST[FileName][0])))][1:], dtype=int)
     train_label = train_arr.T[0].tolist()
-    train_data = train_arr.T[1:].T.tolist()
+    train_data = train_arr.T[1:].T
+    print(len(train_label))
+    print(train_data.shape)
+    
 
     test_data = [i for i in csv.reader(open(os.path.join(DATA_DIR, MNIST[FileName][1])))][1:]
 
