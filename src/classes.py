@@ -363,16 +363,21 @@ class NetWork:
                 weight.optimize()
         return accuracy/SAMPLE_SIZE, error / SAMPLE_SIZE, self.weight_active_percent()
 
-    def test(self, test_data: np.array, test_labels: list) -> tuple:
+    def test(self, test_data: np.array, test_labels=None):
+        if test_labels is None:
+            test_labels = []
         self.layers[0].net_values = test_data
         data_amount = len(test_labels)
         for layer in self.layers:
             layer.test_normalize()
             layer.activate()
             layer.calc_net_values()
-        accuracy = self.calc_correct_num(test_labels) / data_amount
-        error = self.calc_error_sum(test_labels) / data_amount
-        return accuracy, error, self.l1_norm(), self.l2_norm(), self.total_node()
+        if test_labels:
+            accuracy = self.calc_correct_num(test_labels) / data_amount
+            error = self.calc_error_sum(test_labels) / data_amount
+            return accuracy, error, self.l1_norm(), self.l2_norm(), self.total_node()
+        else:
+            return np.argmax(self.layers[-1].activated_values, axis=1).tolist()
 
     def is_proved(self, accuracy: list) -> bool:
         if not accuracy:

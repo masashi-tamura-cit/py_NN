@@ -53,6 +53,13 @@ def main(model, dataset):
             training_information_dict = save_info(train_info, test_info, training_information_dict)
             c += 1
     print("train_end, total_time: {0}".format(training_information_dict["total_time"][-1]))
+    value = model.test(test_datas)[0]
+    values = np.array([list(i) for i in enumerate(value)])
+    with open("submission.csv", "w", newline="")as f:
+        writer = csv.writer(f)
+        writer.writerow(["ImageId","Label"])
+        for v in values:
+            writer.writerow(list(v))
     return training_information_dict["accuracy"][-1]
 
 
