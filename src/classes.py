@@ -298,7 +298,7 @@ class NetWork:
         self.deactivate_ratio = {"input_node": {"ratio": 0.1, "alfa": 0.9},
                                  "weight": {"ratio": 0.5, "alfa": 0.4},
                                  "node": {"ratio": 0.2, "alfa": 0.4}}  # target: [deactive_ratio, decline_ratio]
-        self.threshold = {"value": 0.1, "decline_ratio": 0.9}
+        self.threshold = 0.01
 
     def __set_property_str(self, in_dim, md1, md2, optimizer, activation):
         """
@@ -483,9 +483,7 @@ class NetWork:
 
         # 性能が向上したと認められない場合、ロールバックしてレートを落とす
         previous_accuracy = accuracy_list[:latest_epoch]
-        if previous_accuracy and max(target) < max(previous_accuracy) +\
-                (self.threshold["value"] * (1 - max(previous_accuracy))):
-            self.threshold["value"] *= self.threshold["decline_ratio"]
+        if previous_accuracy and max(target) < max(previous_accuracy) + self.threshold:
             for i, l in enumerate(self.layers[-3:-1]):
                 l.active_set = np.ones(l.node_amount)
                 l.node_amount = l.active_set.size
