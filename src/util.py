@@ -55,15 +55,16 @@ def view_mnist(data: np.array, label: int) -> None:
     dim1 = int(np.sqrt(size))
     img = Image.new(mode='RGB', size=(dim1, dim1))
     for i in range(size):
-        cr = int(data[i]*255)
+        cr = int(data[i])
         if data[i] != 0:
             y.append(dim1 - math.floor(i/dim1))
             x.append(i % dim1)
             img.putpixel((i % dim1, math.floor(i/dim1)), (cr, cr, cr))
     plt.scatter(x, y)
     plt.xlabel(label)
-    plt.show()
+    # plt.show()
     img.show()
+    img.save("./mnist.jpg")
 
 
 def view_cifar(data: np.array, label: int) -> None:
@@ -82,3 +83,4 @@ def view_cifar(data: np.array, label: int) -> None:
         img.putpixel((i % 32, math.floor(i / 32)), (r, g, b))
     print(CIFAR10[Label][label])
     img.show()
+    img.save("./cifar_sample.jpg")

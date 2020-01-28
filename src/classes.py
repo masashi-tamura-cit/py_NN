@@ -299,8 +299,8 @@ class NetWork:
         self.last_accuracy = None
         self.previous_info = {"weights": [], "layers": [], "layer_dims": []}
         self.deactivate_ratio = {"input_node": {"ratio": 0.1, "alfa": 0.9},
-                                 "weight": {"ratio": 0.3, "alfa": 0.9},
-                                 "node": {"ratio": 0.6, "alfa": 0.5}}  # target: [deactive_ratio, decline_ratio]
+                                 "weight": {"ratio": 0.5, "alfa": 0.9},
+                                 "node": {"ratio": 0.1, "alfa": 0.99}}  # target: [deactive_ratio, decline_ratio]
 
     def __set_property_str(self, in_dim, md1, md2, optimizer, activation):
         """
@@ -428,13 +428,13 @@ class NetWork:
     def l1_norm(self) -> float:
         norm = 0
         for weight in self.weights:
-            norm += np.abs(weight.weight).sum()
+            norm += np.abs(weight.weight * weight.active_set).sum()
         return norm
 
     def l2_norm(self) -> float:
         norm = 0
         for weight in self.weights:
-            norm += (weight.weight ** 2).sum()
+            norm += ((weight.weight * weight.active_set) ** 2).sum()
         return norm
 
     def total_node(self) -> int:
