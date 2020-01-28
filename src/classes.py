@@ -410,6 +410,7 @@ class NetWork:
         self.layer_dims = []
         for l in self.layers:
             self.layer_dims.append(l.node_amount)
+            l.active_set = np.ones(l.node_amount)
 
     def rollback_layer(self):
         if not self.is_dynamic:
@@ -483,6 +484,8 @@ class NetWork:
 
         # 性能が向上したと認められない場合、ロールバックしてレートを落とす
         previous_accuracy = accuracy_list[:latest_epoch]
+        if previous_accuracy:
+            print(f"after:{max(target)} before:{max(previous_accuracy)}")
         if previous_accuracy and max(target) < max(previous_accuracy) + self.threshold:
             for i, l in enumerate(self.layers[-3:-1]):
                 l.active_set = np.ones(l.node_amount)
@@ -492,10 +495,9 @@ class NetWork:
             for w in self.weights:
                 w.active_set = w.previous_active_set
                 self.deactivate_ratio["weight"]["ratio"] *= self.deactivate_ratio["weight"]["alfa"]
-        else:
-            for layer in self.layers[:-1]:
-                print(layer.node_amount)
-                print(layer.lag_weights.weight.shape)
+        if max(target) >= max(previous_accuracy) + self.threshold:
+            for i in self.layers[1:]:
+                print(i.lead_weights.weight.shape)
         # スパース化
         for i, l in enumerate(self.layers[-3:-1]):
             if not l.lead_weights is None:
