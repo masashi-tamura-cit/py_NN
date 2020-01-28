@@ -152,7 +152,6 @@ class Layer:
         # lag_weightの集計
         # active_set 1次元配列の作成
 
-        current_active_magnification = np.max(self.active_set)
         active_amount = int(self.node_amount - (self.node_amount * ratio))
         if self.node_amount - active_amount <= 1:
             return None
@@ -168,8 +167,6 @@ class Layer:
         max_similarity.append(0)
         border = np.sort(deactivate_priority.flat)[active_amount]
         self.active_set = np.where(deactivate_priority > border, 0, 1) * np.where(np.array(max_similarity) > 0.7, 0, 1)
-        self.active_set = self.active_set * current_active_magnification * (self.active_set.size
-                                                                            / np.sum(self.active_set))
 
     def delete_node(self, optimizer):
         """
