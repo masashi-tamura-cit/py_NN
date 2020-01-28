@@ -299,8 +299,9 @@ class NetWork:
         self.last_accuracy = None
         self.previous_info = {"weights": [], "layers": [], "layer_dims": []}
         self.deactivate_ratio = {"input_node": {"ratio": 0.1, "alfa": 0.9},
-                                 "weight": {"ratio": 0.5, "alfa": 0.9},
-                                 "node": {"ratio": 0.1, "alfa": 0.99}}  # target: [deactive_ratio, decline_ratio]
+                                 "weight": {"ratio": 0.5, "alfa": 0.4},
+                                 "node": {"ratio": 0.2, "alfa": 0.4}}  # target: [deactive_ratio, decline_ratio]
+        self.threshold = {"value": 0.1, "decline_ratio": 0.9}
 
     def __set_property_str(self, in_dim, md1, md2, optimizer, activation):
         """
@@ -483,12 +484,11 @@ class NetWork:
         if not target or len(target) - max(enumerate(target), key=lambda x: x[1])[0] < 5:
             return latest_epoch
 
-        # 性能が低下したと認められる場合、ロールバックしてレートを落とす
+        # 性能が向上したと認められない場合、ロールバックしてレートを落とす
         previous_accuracy = accuracy_list[:latest_epoch]
-        if previous_accuracy and max(target) < max(previous_accuracy):
-            # if len(self.layers) == 4:
-            #    input_layer.active_set = np.ones(input_layer.node_amount)
-            #    self.deactivate_ratio["input_node"]["ratio"] *= self.deactivate_ratio["input_node"]["alfa"]
+        if previous_accuracy and max(target) < max(previous_accuracy) +\
+                (self.threshold["value"] * (1 - max(previous_accuracy))):
+            self.threshold["value"] *= self.threshold["decline_ratio"]
             for i, l in enumerate(self.layers[-3:-1]):
                 l.active_set = np.ones(l.node_amount)
                 l.node_amount = l.active_set.size
