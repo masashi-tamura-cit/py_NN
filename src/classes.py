@@ -495,7 +495,7 @@ class NetWork:
             for w in self.weights:
                 w.active_set = w.previous_active_set
                 self.deactivate_ratio["weight"]["ratio"] *= self.deactivate_ratio["weight"]["alfa"]
-        if max(target) >= max(previous_accuracy) + self.threshold:
+        if previous_accuracy and max(target) >= max(previous_accuracy) + self.threshold:
             for i in self.layers[1:]:
                 print(i.lead_weights.weight.shape)
         # スパース化
