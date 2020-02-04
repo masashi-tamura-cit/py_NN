@@ -61,13 +61,13 @@ class Weights:
         self.optimizer = optimizer
         self.is_fixed = False
         self.active_set = np.ones(weight.shape)
-        self.previous_active_set = np.ones(weight.shape)
+        self.previous_weights = weight
 
-    def calc_grad(self):
+    def calc_grad(self, lm: float = LAMBDA):
         if self.is_fixed:
             return None
         self.gradients = (np.dot(self.lag_layer.delta.T, self.lead_layer.activated_values).T +
-                          (LAMBDA * np.sign(self.weight))) / BATCH_SIZE
+                          (lm * np.sign(self.weight))) / BATCH_SIZE
 
     def optimize(self):
         if self.is_fixed:
@@ -84,9 +84,22 @@ class Weights:
         deactive_amount = int(np.sum(self.active_set) * ratio)
         if deactive_amount <= 1:
             return None
-        self.previous_active_set = self.active_set
-        border = np.sort(np.abs(self.weight.flat))[deactive_amount]
+        border = np.sort(np.abs(self.weight[np.nonzero(self.weight)].flat))[deactive_amount]
         self.active_set = np.where(np.abs(self.weight) < border, 0, 1)
+        self.update_weights()
+
+    def update_weights(self):
+        self.previous_weights = self.weight
+
+        self.weight = self.weight * self.active_set
+        if self.lead_layer:
+            p = np.append(self.lead_layer.active_set, 1)
+            self.weight = (self.weight.T * p).T
+        if self.lag_layer:
+            self.weight = self.weight * self.lag_layer.active_set
+
+    def rollback_weight(self):
+        self.weight = self.previous_weights
 
 
 class Layer: 
@@ -122,8 +135,7 @@ class Layer:
 
     def calc_net_values(self):
         self.lag_weights.lag_layer.net_values \
-            = np.dot(self.activated_values, (self.lag_weights.weight * self.lag_weights.active_set)) *\
-            self.lag_weights.lag_layer.active_set + EPS
+            = np.dot(self.activated_values, self.lag_weights.weight)
 
     def calc_delta(self, labels: list):
         round_z = self.lag_weights.lag_layer.delta.dot(self.lag_weights.weight[:-1].T)
@@ -142,9 +154,8 @@ class Layer:
     def make_active_set(self, ratio):
         """
         active set を作る
-        ０，nの１次元配列で０が非active, 1がactiveとなる
+        0，1の１次元配列で0が非active, 1がactiveとなる
         L1ノルム * 類似度が大きいratio割のノードを非activeにする
-        他の重みが消える分、生き残った重みは均等にall/active倍にする
         :param ratio: 非active化する割合
         :return: None
         """
@@ -166,7 +177,7 @@ class Layer:
         max_similarity = [np.max(cos_similarity[i][i + 1:]) for i in range(cos_similarity.shape[0] - 1)]
         max_similarity.append(0)
         border = np.sort(deactivate_priority.flat)[active_amount]
-        self.active_set = np.where(deactivate_priority > border, 0, 1) * np.where(np.array(max_similarity) > 0.7, 0, 1)
+        self.active_set = np.where(deactivate_priority > border, 0, 1) * np.where(np.array(max_similarity) > 0.85, 0, 1)
 
     def delete_node(self, optimizer):
         """
@@ -335,9 +346,10 @@ class NetWork:
         self.weights[-1].weight.T[-1] = 0
         self.layers[-1].lead_weights.weight = self.layers[-1].lead_weights.weight / np.sqrt(2.0)
 
-    def training(self, train_data, labels, train_layer_num=None) -> tuple:
+    def training(self, train_data, labels, train_layer_num=None, lm=LAMBDA) -> tuple:
         error = 0
         accuracy = 0
+        norm_c = lm if self.is_propose else 0
         if not train_layer_num:
             # index = 3
             index = len(self.weights)
@@ -357,7 +369,7 @@ class NetWork:
             for layer in list(reversed(self.layers))[:index]:
                 layer.calc_delta(key)
             for weight in self.weights[-index:]:
-                weight.calc_grad()
+                weight.calc_grad(lm=norm_c)
                 weight.optimize()
         return accuracy/SAMPLE_SIZE, error / SAMPLE_SIZE, self.weight_active_percent()
 
@@ -493,11 +505,9 @@ class NetWork:
                 self.layer_dims[-3 + i] = l.active_set.size
                 self.deactivate_ratio["node"]["ratio"] *= self.deactivate_ratio["node"]["alfa"]
             for w in self.weights:
-                w.active_set = w.previous_active_set
+                w.active_set = 1
+                w.rollback_weight()
                 self.deactivate_ratio["weight"]["ratio"] *= self.deactivate_ratio["weight"]["alfa"]
-        if previous_accuracy and max(target) >= max(previous_accuracy) + self.threshold:
-            for i in self.layers[1:]:
-                print(i.lead_weights.weight.shape)
         # スパース化
         for i, l in enumerate(self.layers[-3:-1]):
             if not l.lead_weights is None:
@@ -506,6 +516,10 @@ class NetWork:
                 l.make_active_set(self.deactivate_ratio["node"]["ratio"])
         for w in self.weights:
             w.make_active_set(self.deactivate_ratio["weight"]["ratio"])
+
+        if previous_accuracy and max(target) >= max(previous_accuracy) + self.threshold:
+            for i in self.layers[1:]:
+                print(i.lead_weights.weight.shape)
         return len(accuracy_list) - 1
 
     def weight_active_percent(self):
@@ -514,6 +528,6 @@ class NetWork:
         all_weight_amount = 0
         active_weight_amount = 0
         for w in self.weights:
-            all_weight_amount += w.active_set.size
-            active_weight_amount += np.sum(w.active_set)
+            all_weight_amount += np.prod(w.weight.shape)
+            active_weight_amount += np.nonzero(w.weight * w.active_set)[0].shape[0]
         return active_weight_amount / all_weight_amount
