@@ -90,13 +90,7 @@ class Weights:
 
     def update_weights(self):
         self.previous_weights = self.weight
-
         self.weight = self.weight * self.active_set
-        if self.lead_layer:
-            p = np.append(self.lead_layer.active_set, 1)
-            self.weight = (self.weight.T * p).T
-        if self.lag_layer:
-            self.weight = self.weight * self.lag_layer.active_set
 
     def rollback_weight(self):
         self.weight = self.previous_weights
@@ -151,33 +145,33 @@ class Layer:
         self.gamma = self.gamma - (ETA * delta_gamma / BATCH_SIZE)
         self.beta = self.beta - (ETA * delta_beta / BATCH_SIZE)
 
-    def make_active_set(self, ratio):
+    def __make_active_set(self):
         """
         active set を作る
         0，1の１次元配列で0が非active, 1がactiveとなる
-        L1ノルム * 類似度が大きいratio割のノードを非activeにする
+        L1ノルムが小さい（平均 - 標準偏差の2倍以下）　OR 類似度が大きい(0.85)ratio割のノードを非activeにする
         :param ratio: 非active化する割合
         :return: None
         """
-        # lead_weightの集計
-        # lag_weightの集計
-        # active_set 1次元配列の作成
-
-        active_amount = int(self.node_amount - (self.node_amount * ratio))
-        if self.node_amount - active_amount <= 1:
-            return None
-        if self.lead_weights is None:
-            return None
+        # lead_weight, lag_weightの集計
         lead_weight = self.lead_weights.weight
         lead_weight_l1 = np.sum(np.abs(self.lead_weights.weight * self.lead_weights.active_set), axis=0)
         lag_weight_l1 = np.sum(np.abs(self.lag_weights.weight * self.lag_weights.active_set), axis=1)[:-1]
         deactivate_priority = lead_weight_l1 + lag_weight_l1
+        ave = np.average(deactivate_priority)
+        sd = np.var(deactivate_priority) ** .5
+
+        # cos similarity
         norm = (lead_weight ** 2).sum(0, keepdims=True) ** .5
         cos_similarity = lead_weight.T @ lead_weight / norm / norm.T
         max_similarity = [np.max(cos_similarity[i][i + 1:]) for i in range(cos_similarity.shape[0] - 1)]
         max_similarity.append(0)
-        border = np.sort(deactivate_priority.flat)[active_amount]
-        self.active_set = np.where(deactivate_priority > border, 0, 1) * np.where(np.array(max_similarity) > 0.85, 0, 1)
+
+        # make_active_set
+        border = ave - (1.5 * sd)
+        self.active_set = np.where(deactivate_priority < border, 0, 1) * np.where(np.array(max_similarity) > 0.8, 0, 1)
+        print(f"{self.node_amount - sum(np.where(deactivate_priority < border, 0, 1))} norm_base")
+        print(f"{self.node_amount - sum(np.where(np.array(max_similarity) > 0.8, 0, 1))} similarity_base")
 
     def delete_node(self, optimizer):
         """
@@ -190,17 +184,21 @@ class Layer:
         # lead_weightの該当行削除
         # gamma, betaの削除
         c = 0
+        self.__make_active_set()
         for i in range(self.active_set.size):
             if self.active_set[i] == 0:
+                # delete linked weights
                 self.lead_weights.weight = np.delete(self.lead_weights.weight, i - c, axis=1)
                 self.lead_weights.active_set = np.delete(self.lead_weights.active_set, i - c, axis=1)
                 self.lag_weights.weight = np.delete(self.lag_weights.weight, i - c, axis=0)
                 self.lag_weights.active_set = np.delete(self.lag_weights.active_set, i - c, axis=0)
+                # delete self params
                 self.gamma = np.delete(self.gamma, i-c)
                 self.beta = np.delete(self.beta, i-c)
                 self.ave_ave = np.delete(self.ave_ave, i-c)
                 self.var_ave = np.delete(self.var_ave, i-c)
                 c += 1
+                # delete optimizer params
                 if isinstance(optimizer, Adam):
                     self.lead_weights.optimizer.mt = np.delete(self.lead_weights.optimizer.mt, i - c, axis=1)
                     self.lead_weights.optimizer.vt = np.delete(self.lead_weights.optimizer.vt, i - c, axis=1)
@@ -209,7 +207,8 @@ class Layer:
                 if isinstance(optimizer, MomentumSgd):
                     self.lead_weights.optimizer.moment = np.delete(self.lead_weights.optimizer.moment, i - c, axis=1)
                     self.lag_weights.optimizer.moment = np.delete(self.lag_weights.optimizer.moment, i - c, axis=0)
-        self.node_amount = int(round(np.sum(self.active_set)/np.max(self.active_set.flat)))
+        # set node_amount
+        self.node_amount = np.sum(self.active_set)
         self.active_set = np.ones(self.node_amount)
         return self.node_amount
 
@@ -485,6 +484,7 @@ class NetWork:
         2: 最後にスパース化してから、する前の性能以上の性能が出た場合： そのままさらにスパース化する
         3: 性能向上が頭打ちになって、スパース化する前の性能を下回りそうな場合： ロールバックしてレートを落とす
         """
+        print("propose_method ")
         if not self.is_propose:
             return 0
         input_layer = self.layers[0]
@@ -499,11 +499,6 @@ class NetWork:
         if previous_accuracy:
             print(f"after:{max(target)} before:{max(previous_accuracy)}")
         if previous_accuracy and max(target) < max(previous_accuracy) + self.threshold:
-            for i, l in enumerate(self.layers[-3:-1]):
-                l.active_set = np.ones(l.node_amount)
-                l.node_amount = l.active_set.size
-                self.layer_dims[-3 + i] = l.active_set.size
-                self.deactivate_ratio["node"]["ratio"] *= self.deactivate_ratio["node"]["alfa"]
             for w in self.weights:
                 w.active_set = 1
                 w.rollback_weight()
@@ -511,15 +506,14 @@ class NetWork:
         # スパース化
         for i, l in enumerate(self.layers[-3:-1]):
             if not l.lead_weights is None:
-                node_amount = l.delete_node(self.optimizer)
-                self.layer_dims[-3 + i] = node_amount
-                l.make_active_set(self.deactivate_ratio["node"]["ratio"])
+                self.layer_dims[-3 + i] = l.delete_node(self.optimizer)
         for w in self.weights:
             w.make_active_set(self.deactivate_ratio["weight"]["ratio"])
 
         if previous_accuracy and max(target) >= max(previous_accuracy) + self.threshold:
             for i in self.layers[1:]:
                 print(i.lead_weights.weight.shape)
+                print(self.weight_active_percent())
         return len(accuracy_list) - 1
 
     def weight_active_percent(self):
