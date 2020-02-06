@@ -48,6 +48,6 @@ BETA1 = 0.9
 BETA2 = 0.999
 EPS = pow(10, -8)
 
-LAMBDA = 0.01  # for norm
+LAMBDA = 0.001  # for norm
 OUTPUT_BASE_DIR = os.path.join(DATA_DIR, "output")
 OUTPUT_DIR = os.path.join(OUTPUT_BASE_DIR, f"lm_{LAMBDA}")
