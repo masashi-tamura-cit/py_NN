@@ -374,8 +374,8 @@ class NetWork:
             # back propagation
             for layer in list(reversed(self.layers))[:index]:
                 layer.calc_delta(key)
-            for weight in self.weights[-index:]:
-                weight.calc_grad(lm=norm_c)
+            for i, weight in enumerate(self.weights[-index:]):
+                weight.calc_grad(lm=norm_c ** (len(self.weights[-index:])) - i)
                 weight.optimize()
         return accuracy/SAMPLE_SIZE, error / SAMPLE_SIZE, self.weight_active_percent()
 
