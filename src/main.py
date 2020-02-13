@@ -12,24 +12,23 @@ import datetime
 
 def main(model, dataset):
     (train_data, train_label, test_data, test_label) = dataset
-    train_data = train_data[:SAMPLE_SIZE]
-    train_label = train_label[:SAMPLE_SIZE]
-    # train_train or not
-    test_data = test_data[:VALIDATION_DATA]
-    test_label = test_label[:VALIDATION_DATA]
-    # test_data = train_data[:VALIDATION_DATA]
-    # test_label = train_label[:VALIDATION_DATA]
+    validation_data = train_data[-VALIDATION_DATA:]
+    validation_label = train_label[-VALIDATION_DATA:]
+    train_data = train_data[:-VALIDATION_DATA]
+    train_label = train_label[:-VALIDATION_DATA]
     latest_epoch = 0
     c = 0
     training_information_dict = \
         {"train_accuracy": [], "train_error": [], "accuracy": [], "error": [], "l1_norm": [], "l2_norm": [],
          "node_amount": [], "epoch_time": [], "total_time": [], "weight_active_ratio": []}
     start = 0
+
+    train_data, train_label = shuffle_data(train_data, train_label)
     is_proved = True
     while is_proved:
         while not early_stopping(training_information_dict["error"], start):
-            train_info = train_epoch(model, train_data, train_label)
-            test_info = model.test(test_data, test_label)
+            train_info = train_epoch(model, train_data[:SAMPLE_SIZE], train_label[:SAMPLE_SIZE])
+            test_info = model.test(validation_data, validation_label)
             training_information_dict = save_info(train_info, test_info, training_information_dict)
             latest_epoch = model.propose_method(training_information_dict["accuracy"], latest_epoch)
             c += 1
@@ -41,17 +40,19 @@ def main(model, dataset):
     # additional leaning
     if model.is_dynamic:
         model.rollback_layer()
-        for i in range(10):
-            train_info = train_epoch(model, train_data, train_label, 2)
-            test_info = model.test(test_data, test_label)
+        for i in range(2):
+            train_info = train_epoch(model, train_data[:SAMPLE_SIZE], train_label[:SAMPLE_SIZE], 2, 0)
+            test_info = model.test(validation_data, validation_label)
             training_information_dict = save_info(train_info, test_info, training_information_dict)
             c += 1
-        for i in range(10):
-            train_info = train_epoch(model, train_data, train_label, 1)
-            test_info = model.test(test_data, test_label)
+        for i in range(2):
+            train_info = train_epoch(model, train_data[:SAMPLE_SIZE], train_label[:SAMPLE_SIZE], 1, 0)
+            test_info = model.test(validation_data, validation_label)
             training_information_dict = save_info(train_info, test_info, training_information_dict)
             c += 1
+    test_info = model.test(test_data, test_label)
     print("train_end, total_time: {0}".format(training_information_dict["total_time"][-1]))
+    print("final_accuracy: {0}".format(test_info[0]))
     make_csv(training_information_dict, model.property_str)
 
 
@@ -149,13 +150,13 @@ def shuffle_data(data: np.array, label: list) -> tuple:
     return return_data, return_label
 
 
-def train_epoch(network, train_data, train_label, train_layer_num=None):
+def train_epoch(network, train_data, train_label, train_layer_num=None, lm=LAMBDA):
     data, label = transform_data(*shuffle_data(train_data, train_label))
     start = time.time()
     if not train_layer_num:
         accuracy, error, weight_active_ratio = network.training(data, label)
     else:
-        accuracy, error, weight_active_ratio = network.training(data, label, train_layer_num)
+        accuracy, error, weight_active_ratio = network.training(data, label, train_layer_num=train_layer_num, lm=lm)
     end = time.time()
     return end - start, accuracy, error, weight_active_ratio
 
@@ -188,6 +189,9 @@ def early_stopping(err: list, start) -> bool:
     if len(err) == start:
         return False
     arg_min = np.argmin(np.array(err[start:]))
+    if np.min(np.array(err[start:])) < np.min(np.array(err)):
+        arg_min = 0
+    # arg_min = np.arg_min(err) - start
     if (len(err[start:]) - arg_min) < EARLY_STOPPING_EPOCH:
         return False
     return True
@@ -218,7 +222,7 @@ def make_csv(information_dict: dict, dir_name: str):
 
 
 if __name__ == "__main__":
-    for data_set in [MNIST, CIFAR10]:
+    for data_set in [MNIST]:
         if data_set[DataSet] == "MNIST":
             data_tuple = read_mnist()
         elif data_set[DataSet] == "CIFAR10":
@@ -226,6 +230,12 @@ if __name__ == "__main__":
         else:
             print("wrong dataset")
             sys.exit()
-        for _ in range(10):
+        for _ in range(20):
+            main(NetWork(hidden_layer=2, in_dim=data_set[DataLength], activation=ReLU, optimizer=ADAM,
+                         md1=500, md2=1000, out_dim=CLASS_NUM, dynamic=False, propose=True), data_tuple)
             main(NetWork(hidden_layer=2, in_dim=data_set[DataLength], activation=ReLU, optimizer=ADAM,
                          md1=500, md2=1000, out_dim=CLASS_NUM, dynamic=True, propose=True), data_tuple)
+            main(NetWork(hidden_layer=2, in_dim=data_set[DataLength], activation=ReLU, optimizer=ADAM,
+                         md1=500, md2=1000, out_dim=CLASS_NUM, dynamic=False, propose=False), data_tuple)
+            main(NetWork(hidden_layer=2, in_dim=data_set[DataLength], activation=ReLU, optimizer=ADAM,
+                         md1=500, md2=1000, out_dim=CLASS_NUM, dynamic=True, propose=False), data_tuple)

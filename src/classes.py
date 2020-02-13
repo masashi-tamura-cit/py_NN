@@ -176,8 +176,6 @@ class Layer:
         # make_active_set
         border = ave - (1.5 * sd)
         self.active_set = np.where(deactivate_priority < border, 0, 1) * np.where(np.array(max_similarity) > 0.95, 0, 1)
-        print(f"{self.node_amount - sum(np.where(deactivate_priority < border, 0, 1))} norm_base")
-        print(f"{self.node_amount - sum(np.where(np.array(max_similarity) > 0.95, 0, 1))} similarity_base")
 
     def delete_node(self, optimizer):
         """
@@ -375,7 +373,7 @@ class NetWork:
             for layer in list(reversed(self.layers))[:index]:
                 layer.calc_delta(key)
             for i, weight in enumerate(self.weights[-index:]):
-                weight.calc_grad(lm=norm_c ** (len(self.weights[-index:])) - i)
+                weight.calc_grad(lm=norm_c ** ((len(self.weights[-index:]) - i) + 1))
                 weight.optimize()
         return accuracy/SAMPLE_SIZE, error / SAMPLE_SIZE, self.weight_active_percent()
 
@@ -502,8 +500,6 @@ class NetWork:
 
         # 性能が向上したと認められない場合、ロールバックしてレートを落とす
         previous_accuracy = accuracy_list[:latest_epoch]
-        if previous_accuracy:
-            print(f"after:{max(target)} before:{max(previous_accuracy)}")
         if previous_accuracy and max(target) < max(previous_accuracy) + self.threshold:
             for w in self.weights:
                 w.rollback_weight()
